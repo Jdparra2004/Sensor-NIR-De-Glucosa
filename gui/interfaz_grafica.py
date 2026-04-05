@@ -164,9 +164,6 @@ class AppGlucosaNIR(tk.Tk):
 
         self.var_caudal = self._slider_param(
             p, "Caudal [nL/min]", 1, 100, 10, step=1)
-
-        # Llamar al nuevo panel clínico 
-        self._crear_panel_clinico(p)
         
         ttk.Separator(p, orient="horizontal").pack(fill="x", padx=10, pady=6)
 
@@ -246,11 +243,18 @@ class AppGlucosaNIR(tk.Tk):
         self.tab4 = tk.Frame(self.notebook, bg=COLOR_BG)
         self.notebook.add(self.tab4, text="  Microfluídica  ")
 
+        # --- NUEVO: Tab 5: Diagnóstico Clínico ---
+        self.tab5 = tk.Frame(self.notebook, bg=COLOR_BG)
+        self.notebook.add(self.tab5, text="  Diagnóstico Clínico  ")
+
         # Figuras de Matplotlib para cada tab
         self._fig1, self._ax1 = self._nueva_figura(self.tab1)
         self._fig2, self._ax2 = self._nueva_figura(self.tab2)
         self._fig3, self._axes3 = self._nueva_figura(self.tab3, subplots=(1, 2))
         self._fig4, self._axes4 = self._nueva_figura(self.tab4, subplots=(1, 2))
+
+        # Dibujar el panel clínico dentro de la nueva pestaña (tab5)
+        self._crear_panel_clinico(self.tab5)
 
     def _nueva_figura(self, parent, subplots=None):
         """Crea e incrusta una figura Matplotlib en un Frame de Tkinter."""
