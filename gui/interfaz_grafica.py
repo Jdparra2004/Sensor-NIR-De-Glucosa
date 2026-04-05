@@ -94,7 +94,7 @@ class AppGlucosaNIR(tk.Tk):
 
         tk.Label(
             frame_titulo,
-            text="Bioingeniería UPB  ",
+            text="Bioingeniería ",
             font=FONT_SMALL, bg=COLOR_ACCENT, fg="#BDE0F0", anchor="e"
         ).pack(side="right", padx=10)
 
