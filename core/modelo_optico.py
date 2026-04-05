@@ -1,9 +1,7 @@
 """
-=============================================================================
 MÓDULO: modelo_optico.py
 PROYECTO: Evaluación paramétrica de detección óptica NIR de glucosa en sudor
 PROGRAMA: Bioingeniería - Trabajo de Grado
-=============================================================================
 
 Descripción:
     Implementa el modelo matemático de detección óptica basado en la
@@ -22,15 +20,11 @@ Referencias:
     - Amerov, A.K., Chen, J., Arnold, M.A. (2004). Applied Spectroscopy, 58(10).
     - Heise, H.M. et al. (2021). Biosensors, 11(3).
     - Yang, M. et al. (2025). Advanced Sensor Research, 4(3).
-=============================================================================
 """
 
 import numpy as np
 
-
-# ---------------------------------------------------------------------------
 # PARÁMETROS DEL MODELO (valores de referencia desde literatura)
-# ---------------------------------------------------------------------------
 
 # Coeficientes molares de absorción de la glucosa en NIR [mM^-1 · mm^-1]
 # Fuente: Amerov et al. (2004) - primer sobretono y región de combinación
@@ -77,27 +71,23 @@ CONCENTRACION_AGUA = 55_500.0  # ~55.5 M = 55500 mM
 # Longitud de onda de referencia del estudio (Yang et al., 2025)
 LAMBDA_REFERENCIA_NM = 1600
 
-
-# ---------------------------------------------------------------------------
 # CLASE PRINCIPAL DEL MODELO
-# ---------------------------------------------------------------------------
 
 class ModeloBeerLambertNIR:
     """
     Modelo de absorbancia óptica NIR para detección de glucosa en sudor.
 
     Implementa la Ley de Beer-Lambert adaptada considerando:
-      1. Absorción directa de la glucosa.
-      2. Absorción del agua como interferente dominante.
-      3. Corrección por desplazamiento de agua (water displacement).
+    1. Absorción directa de la glucosa.
+    2. Absorción del agua como interferente dominante.
+    3. Corrección por desplazamiento de agua (water displacement).
 
     Ecuación central:
         A_neta(λ, C) = ε_g(λ) · C · L
-                       - ε_w(λ) · δ_w · C · L
+                        - ε_w(λ) · δ_w · C · L
         donde δ_w es el coeficiente de desplazamiento volumétrico.
 
     Parámetros
-    ----------
     longitud_optica_mm : float
         Longitud del camino óptico efectivo [mm]. Representa la
         profundidad de interacción de la radiación NIR con el fluido.
@@ -108,19 +98,19 @@ class ModeloBeerLambertNIR:
     """
 
     def __init__(self, longitud_optica_mm: float = 1.0,
-                 incluir_desplazamiento_agua: bool = True):
+                incluir_desplazamiento_agua: bool = True):
         self.longitud_optica_mm = longitud_optica_mm
         self.incluir_desplazamiento_agua = incluir_desplazamiento_agua
         self._longitudes_onda = sorted(ABSORPTIVIDAD_GLUCOSA.keys())
 
-    # --- Propiedades ----------------------------------------------------------
+    # Propiedades 
 
     @property
     def longitudes_onda(self) -> np.ndarray:
         """Array de longitudes de onda disponibles [nm]."""
         return np.array(self._longitudes_onda)
 
-    # --- Métodos del modelo ---------------------------------------------------
+    # Métodos del modelo 
 
     def absorbancia(self, concentracion_mM: float,
                     lambda_nm: float = None) -> np.ndarray | float:
@@ -128,7 +118,6 @@ class ModeloBeerLambertNIR:
         Calcula la absorbancia óptica A para una concentración dada.
 
         Parámetros
-        ----------
         concentracion_mM : float
             Concentración de glucosa en el sudor [mM].
             Rango fisiológico reportado: 0.01 – 1.0 mM.
@@ -137,7 +126,6 @@ class ModeloBeerLambertNIR:
             para todas las longitudes de onda disponibles.
 
         Retorna
-        -------
         float o np.ndarray
             Absorbancia A(λ, C) [adimensional, escala log10].
         """
@@ -190,14 +178,12 @@ class ModeloBeerLambertNIR:
         Calcula A para un vector de concentraciones a λ fija.
 
         Parámetros
-        ----------
         concentraciones_mM : np.ndarray
             Vector de concentraciones de glucosa [mM].
         lambda_nm : float
             Longitud de onda de análisis [nm].
 
         Retorna
-        -------
         np.ndarray
             Vector de absorbancias correspondiente.
         """
@@ -209,7 +195,6 @@ class ModeloBeerLambertNIR:
         Retorna el espectro NIR completo para una concentración dada.
 
         Retorna
-        -------
         (lambdas_nm, absorbancias) : tuple de np.ndarray
         """
         lambdas = self.longitudes_onda

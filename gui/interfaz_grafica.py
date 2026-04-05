@@ -1,8 +1,6 @@
 """
-=============================================================================
 MÓDULO: interfaz_grafica.py
 PROYECTO: Evaluación paramétrica de detección óptica NIR de glucosa en sudor
-=============================================================================
 
 Descripción:
     Interfaz gráfica (GUI) desarrollada con Tkinter + Matplotlib.
@@ -17,7 +15,6 @@ Uso:
     o desde main.py:
         from gui.interfaz_grafica import IniciarGUI
         IniciarGUI()
-=============================================================================
 """
 
 import sys
@@ -39,10 +36,7 @@ from core.modelo_optico import ModeloBeerLambertNIR
 from core.modelo_microfluido import ModeloMicrofluido
 from core.simulacion_parametrica import SimulacionParametrica
 
-
-# ---------------------------------------------------------------------------
 # COLORES Y ESTILOS DE LA INTERFAZ
-# ---------------------------------------------------------------------------
 
 COLOR_BG = "#F4F6F8"
 COLOR_PANEL = "#FFFFFF"
@@ -56,10 +50,7 @@ FONT_SUBTITULO = ("Helvetica", 11, "bold")
 FONT_LABEL = ("Helvetica", 9)
 FONT_SMALL = ("Helvetica", 8)
 
-
-# ---------------------------------------------------------------------------
 # VENTANA PRINCIPAL
-# ---------------------------------------------------------------------------
 
 class AppGlucosaNIR(tk.Tk):
     """
@@ -76,14 +67,12 @@ class AppGlucosaNIR(tk.Tk):
 
         self._construir_ui()
 
-    # =========================================================================
     # CONSTRUCCIÓN DE LA INTERFAZ
-    # =========================================================================
 
     def _construir_ui(self):
         """Construye los widgets principales de la interfaz."""
 
-        # --- Barra de título --------------------------------------------------
+        # Barra de título 
         frame_titulo = tk.Frame(self, bg=COLOR_ACCENT, height=55)
         frame_titulo.pack(fill="x")
         tk.Label(
@@ -98,13 +87,13 @@ class AppGlucosaNIR(tk.Tk):
             font=FONT_SMALL, bg=COLOR_ACCENT, fg="#BDE0F0", anchor="e"
         ).pack(side="right", padx=10)
 
-        # --- Contenido principal: panel izquierdo + área de gráficas ----------
+        # Contenido principal: panel izquierdo + área de gráficas 
         frame_main = tk.Frame(self, bg=COLOR_BG)
         frame_main.pack(fill="both", expand=True, padx=8, pady=8)
 
         # Panel de parámetros (izquierda)
         self.frame_params = tk.Frame(frame_main, bg=COLOR_PANEL,
-                                     width=280, relief="groove", bd=1)
+                                    width=280, relief="groove", bd=1)
         self.frame_params.pack(side="left", fill="y", padx=(0, 6))
         self.frame_params.pack_propagate(False)
 
@@ -116,11 +105,11 @@ class AppGlucosaNIR(tk.Tk):
 
         self._construir_area_graficas()
 
-        # --- Barra de estado --------------------------------------------------
+        # Barra de estado
         self.var_estado = tk.StringVar(value="Listo. Configure los parámetros y ejecute una simulación.")
         tk.Label(self, textvariable=self.var_estado, font=FONT_SMALL,
-                 bg="#E8EBF0", anchor="w", relief="sunken",
-                 bd=1).pack(fill="x", side="bottom")
+                bg="#E8EBF0", anchor="w", relief="sunken",
+                bd=1).pack(fill="x", side="bottom")
 
         # Ejecutar simulación inicial
         self._ejecutar_simulacion()
@@ -130,14 +119,14 @@ class AppGlucosaNIR(tk.Tk):
         p = self.frame_params
 
         tk.Label(p, text="PARÁMETROS DEL MODELO",
-                 font=FONT_SUBTITULO, bg=COLOR_PANEL,
-                 fg=COLOR_TITULO).pack(pady=(14, 2), padx=10, anchor="w")
+                font=FONT_SUBTITULO, bg=COLOR_PANEL,
+                fg=COLOR_TITULO).pack(pady=(14, 2), padx=10, anchor="w")
         ttk.Separator(p, orient="horizontal").pack(fill="x", padx=10, pady=4)
 
-        # --- Sección: Parámetros ópticos --------------------------------------
+        # Sección: Parámetros ópticos 
         tk.Label(p, text="⬤  Modelo Óptico (Beer-Lambert)",
-                 font=("Helvetica", 9, "bold"), bg=COLOR_PANEL,
-                 fg=COLOR_ACCENT).pack(anchor="w", padx=12, pady=(6, 2))
+                font=("Helvetica", 9, "bold"), bg=COLOR_PANEL,
+                fg=COLOR_ACCENT).pack(anchor="w", padx=12, pady=(6, 2))
 
         self.var_lambda = self._slider_param(
             p, "Longitud de onda λ [nm]", 1000, 1700, 1600, step=50)
@@ -162,10 +151,10 @@ class AppGlucosaNIR(tk.Tk):
 
         ttk.Separator(p, orient="horizontal").pack(fill="x", padx=10, pady=6)
 
-        # --- Sección: Microfluídica -------------------------------------------
+        # Sección: Microfluídica 
         tk.Label(p, text="⬤  Modelo Microfluídico",
-                 font=("Helvetica", 9, "bold"), bg=COLOR_PANEL,
-                 fg=COLOR_ACCENT).pack(anchor="w", padx=12, pady=(2, 2))
+                font=("Helvetica", 9, "bold"), bg=COLOR_PANEL,
+                fg=COLOR_ACCENT).pack(anchor="w", padx=12, pady=(2, 2))
 
         self.var_ancho_canal = self._slider_param(
             p, "Ancho canal [µm]", 50, 500, 200, step=10)
@@ -178,7 +167,7 @@ class AppGlucosaNIR(tk.Tk):
 
         ttk.Separator(p, orient="horizontal").pack(fill="x", padx=10, pady=6)
 
-        # --- Botones ----------------------------------------------------------
+        # Botones 
         tk.Button(
             p, text="▶  Ejecutar Simulación",
             bg=COLOR_BTN, fg=COLOR_BTN_FG,
@@ -204,13 +193,13 @@ class AppGlucosaNIR(tk.Tk):
         ).pack(fill="x", padx=12, pady=2)
 
     def _slider_param(self, parent, label: str, vmin, vmax, default,
-                      step=1, es_float=False):
+                    step=1, es_float=False):
         """Crea un slider + etiqueta de valor para un parámetro."""
         frame = tk.Frame(parent, bg=COLOR_PANEL)
         frame.pack(fill="x", padx=12, pady=2)
 
         tk.Label(frame, text=label, font=FONT_SMALL,
-                 bg=COLOR_PANEL, anchor="w").pack(anchor="w")
+                bg=COLOR_PANEL, anchor="w").pack(anchor="w")
 
         var = tk.DoubleVar(value=default)
         var_display = tk.StringVar(value=str(default))
@@ -229,7 +218,7 @@ class AppGlucosaNIR(tk.Tk):
         slider.pack(side="left", fill="x", expand=True)
 
         tk.Label(row, textvariable=var_display, font=FONT_SMALL,
-                 bg=COLOR_PANEL, width=6, anchor="e").pack(side="right")
+                bg=COLOR_PANEL, width=6, anchor="e").pack(side="right")
 
         return var
 
@@ -280,9 +269,7 @@ class AppGlucosaNIR(tk.Tk):
         fig._canvas = canvas  # referencia para draw()
         return fig, axes
 
-    # =========================================================================
     # LÓGICA DE SIMULACIÓN
-    # =========================================================================
 
     def _ejecutar_simulacion(self, *args):
         """Recoge parámetros y actualiza todas las gráficas."""
@@ -306,7 +293,7 @@ class AppGlucosaNIR(tk.Tk):
             modelo_op = ModeloBeerLambertNIR(L, incluir_desplazamiento_agua=corr_agua)
             modelo_mf = ModeloMicrofluido(ancho, alto, 5.0, caudal)
 
-            # --- Tab 1: A vs C ---
+            # Tab 1: A vs C 
             C_vec = np.linspace(C_min, C_max, 100)
             A_vec = modelo_op.barrido_concentraciones(C_vec, lambda_nm)
             modelo_op2 = ModeloBeerLambertNIR(L, incluir_desplazamiento_agua=False)
@@ -321,13 +308,13 @@ class AppGlucosaNIR(tk.Tk):
             ax.set_xlabel("Concentración glucosa [mM]", fontsize=9)
             ax.set_ylabel("Absorbancia A [u.a.]", fontsize=9)
             ax.set_title(f"Absorbancia vs Concentración  (λ={lambda_nm:.0f} nm)",
-                         fontsize=10)
+                        fontsize=10)
             ax.legend(fontsize=8)
             ax.grid(True, alpha=0.3)
             ax.axvspan(0.01, 1.0, alpha=0.06, color="green")
             self._fig1._canvas.draw()
 
-            # --- Tab 2: Espectro NIR ---
+            # Tab 2: Espectro NIR 
             lambdas = modelo_op.longitudes_onda
             concs = [C_min, (C_min + C_max) / 2, C_max]
             import matplotlib.cm as cm
@@ -338,7 +325,7 @@ class AppGlucosaNIR(tk.Tk):
             for i, C in enumerate(concs):
                 _, A = modelo_op.espectro_completo(C)
                 ax2.plot(lambdas, A, color=cmap(0.2 + i * 0.35),
-                         lw=2, marker="o", ms=5, label=f"C={C:.3f} mM")
+                        lw=2, marker="o", ms=5, label=f"C={C:.3f} mM")
             ax2.set_xlabel("Longitud de onda λ [nm]", fontsize=9)
             ax2.set_ylabel("Absorbancia A [u.a.]", fontsize=9)
             ax2.set_title("Espectro NIR simulado", fontsize=10)
@@ -347,7 +334,7 @@ class AppGlucosaNIR(tk.Tk):
             ax2.grid(True, alpha=0.3)
             self._fig2._canvas.draw()
 
-            # --- Tab 3: Sensibilidad ---
+            # Tab 3: Sensibilidad 
             L_vec = np.linspace(0.1, 10.0, 50)
             sens = []
             A_Cref = []
@@ -376,7 +363,7 @@ class AppGlucosaNIR(tk.Tk):
             self._fig3.tight_layout()
             self._fig3._canvas.draw()
 
-            # --- Tab 4: Microfluídica ---
+            # Tab 4: Microfluídica 
             params = modelo_mf.resumen_parametros()
             Q_vec = np.linspace(1, 100, 50)
             Re_vec = []
@@ -453,10 +440,7 @@ class AppGlucosaNIR(tk.Tk):
         self.var_caudal.set(10)
         self._ejecutar_simulacion()
 
-
-# ---------------------------------------------------------------------------
 # PUNTO DE ENTRADA
-# ---------------------------------------------------------------------------
 
 def IniciarGUI():
     """Lanza la interfaz gráfica."""

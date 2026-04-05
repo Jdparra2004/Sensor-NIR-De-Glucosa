@@ -1,8 +1,6 @@
 """
-=============================================================================
 MÓDULO: simulacion_parametrica.py
 PROYECTO: Evaluación paramétrica de detección óptica NIR de glucosa en sudor
-=============================================================================
 
 Descripción:
     Motor de simulación paramétrica que permite explorar el espacio de
@@ -19,7 +17,6 @@ Referencias:
     - Amerov et al. (2004): rangos de absorptividad NIR glucosa
     - Gao et al. (2016): rango fisiológico glucosa en sudor (0.01–1.0 mM)
     - Yin et al. (2025): variabilidad fisiológica del sistema
-=============================================================================
 """
 
 import numpy as np
@@ -30,10 +27,7 @@ import json
 from core.modelo_optico import ModeloBeerLambertNIR, LAMBDA_REFERENCIA_NM
 from core.modelo_microfluido import ModeloMicrofluido
 
-
-# ---------------------------------------------------------------------------
 # CONFIGURACIÓN DE SIMULACIÓN POR DEFECTO
-# ---------------------------------------------------------------------------
 
 CONFIGURACION_DEFAULT = {
     # Rango fisiológico de glucosa en sudor (Gao et al., 2016)
@@ -56,10 +50,7 @@ CONFIGURACION_DEFAULT = {
     "caudal_nL_min": 10.0,
 }
 
-
-# ---------------------------------------------------------------------------
 # CLASE DE SIMULACIÓN
-# ---------------------------------------------------------------------------
 
 class SimulacionParametrica:
     """
@@ -75,7 +66,6 @@ class SimulacionParametrica:
     facilitar el análisis y la visualización posterior.
 
     Parámetros
-    ----------
     config : dict, opcional
         Diccionario de configuración. Si no se provee, se usa la
         configuración por defecto.
@@ -85,9 +75,7 @@ class SimulacionParametrica:
         self.config = config or CONFIGURACION_DEFAULT.copy()
         self.resultados = {}
 
-    # =========================================================================
     # SIMULACIÓN 1: Absorbancia vs Concentración (a λ fija)
-    # =========================================================================
 
     def sim_absorbancia_vs_concentracion(
             self,
@@ -102,7 +90,6 @@ class SimulacionParametrica:
         sensibilidad ante cambios de concentración en rango fisiológico.
 
         Retorna
-        -------
         pd.DataFrame con columnas: C_mM, A_con_correccion, A_sin_correccion
         """
         L = longitud_optica_mm or self.config["longitud_optica_mm"]
@@ -129,9 +116,7 @@ class SimulacionParametrica:
         self.resultados["absorbancia_vs_concentracion"] = df
         return df
 
-    # =========================================================================
     # SIMULACIÓN 2: Espectro NIR (A vs λ) a concentraciones múltiples
-    # =========================================================================
 
     def sim_espectro_nir(
             self,
@@ -145,7 +130,6 @@ class SimulacionParametrica:
         comparar la señal en función de la concentración.
 
         Retorna
-        -------
         pd.DataFrame con columnas: lambda_nm, A_C=0.01, A_C=0.1, ...
         """
         L = longitud_optica_mm or self.config["longitud_optica_mm"]
@@ -165,9 +149,7 @@ class SimulacionParametrica:
         self.resultados["espectro_nir"] = df
         return df
 
-    # =========================================================================
     # SIMULACIÓN 3: Sensibilidad paramétrica (dA/dθ)
-    # =========================================================================
 
     def sim_sensibilidad_longitud_optica(
             self,
@@ -183,7 +165,6 @@ class SimulacionParametrica:
         de agua → relación no lineal que este análisis revela.
 
         Retorna
-        -------
         pd.DataFrame con columnas: L_mm, A_en_Cref, sensibilidad_dA_dC
         """
         if longitudes_opticas_mm is None:
@@ -204,9 +185,7 @@ class SimulacionParametrica:
         self.resultados["sensibilidad_longitud_optica"] = df
         return df
 
-    # =========================================================================
     # SIMULACIÓN 4: Parámetros microfluídicos
-    # =========================================================================
 
     def sim_parametros_microfluido(
             self,
@@ -220,7 +199,6 @@ class SimulacionParametrica:
         efectiva en función de parámetros geométricos y de flujo.
 
         Retorna
-        -------
         pd.DataFrame con métricas del flujo para cada combinación.
         """
         if anchos_um is None:
@@ -247,9 +225,7 @@ class SimulacionParametrica:
         self.resultados["parametros_microfluido"] = df
         return df
 
-    # =========================================================================
     # SIMULACIÓN 5: Barrido completo λ × C
-    # =========================================================================
 
     def sim_mapa_absorbancia(
             self,
@@ -263,7 +239,6 @@ class SimulacionParametrica:
         detección según rango de concentración fisiológico.
 
         Retorna
-        -------
         pd.DataFrame en formato long: lambda_nm, C_mM, absorbancia
         """
         L = longitud_optica_mm or self.config["longitud_optica_mm"]
@@ -290,9 +265,7 @@ class SimulacionParametrica:
         self.resultados["mapa_absorbancia"] = df
         return df
 
-    # =========================================================================
     # UTILIDADES
-    # =========================================================================
 
     def exportar_resultados(self, carpeta: str = "outputs"):
         """Exporta todos los DataFrames de resultados a archivos CSV."""

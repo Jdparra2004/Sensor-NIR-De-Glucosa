@@ -1,29 +1,13 @@
 """
-=============================================================================
 main.py — Punto de entrada del proyecto
-=============================================================================
 
 PROYECTO: Evaluación paramétrica de un modelo matemático para el monitoreo
-          no invasivo de glucosa en el sudor, mediante simulación numérica
-          computacional basada en detección óptica de infrarrojo cercano (NIR)
+        no invasivo de glucosa en el sudor, mediante simulación numérica
+        computacional basada en detección óptica de infrarrojo cercano (NIR)
 
 PROGRAMA: Bioingeniería — Trabajo de Grado
 MODALIDAD: 100% virtual — Producto Tecnológico Digital
 
-=============================================================================
-MODOS DE USO
-=============================================================================
-
-1. INTERFAZ GRÁFICA (recomendado):
-   python main.py
-
-2. SIMULACIÓN EN CONSOLA (sin GUI):
-   python main.py --consola
-
-3. SIMULACIÓN RÁPIDA + exportar CSV:
-   python main.py --exportar
-
-=============================================================================
 """
 
 import sys
@@ -56,7 +40,7 @@ def modo_consola():
     # --- Modelo óptico básico ---
     print("\n[1] Modelo Óptico — Beer-Lambert NIR")
     modelo = ModeloBeerLambertNIR(longitud_optica_mm=1.0,
-                                  incluir_desplazamiento_agua=True)
+                                incluir_desplazamiento_agua=True)
 
     concentraciones = [0.01, 0.05, 0.1, 0.25, 0.5, 1.0]
     lambda_ref = 1600  # nm
@@ -77,7 +61,7 @@ def modo_consola():
     # --- Modelo microfluídico ---
     print("\n[2] Modelo Microfluídico — Canal conceptual")
     mf = ModeloMicrofluido(ancho_um=200, alto_um=50,
-                           largo_mm=5.0, caudal_nL_min=10.0)
+                            largo_mm=5.0, caudal_nL_min=10.0)
     params = mf.resumen_parametros()
     print()
     for k, v in params.items():
@@ -102,10 +86,7 @@ def modo_exportar():
     sim.exportar_resultados("outputs")
     print("\n✓ Archivos guardados en la carpeta 'outputs/'")
 
-
-# ---------------------------------------------------------------------------
-# PUNTO DE ENTRADA
-# ---------------------------------------------------------------------------
+# Punto de Entrada
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(

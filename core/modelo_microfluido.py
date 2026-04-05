@@ -1,8 +1,6 @@
 """
-=============================================================================
 MÓDULO: modelo_microfluido.py
 PROYECTO: Evaluación paramétrica de detección óptica NIR de glucosa en sudor
-=============================================================================
 
 Descripción:
     Modelo conceptual simplificado del transporte microfluídico del sudor
@@ -23,21 +21,17 @@ Referencias:
     - Squires, T.M. & Quake, S.R. (2005). Reviews of Modern Physics, 77(3).
     - Whitesides, G.M. (2006). Nature, 442(7101).
     - Bruus, H. (1997). Theoretical Microfluidics.
-=============================================================================
 """
 
 import numpy as np
 
-
-# ---------------------------------------------------------------------------
 # CONSTANTES FÍSICAS DEL SISTEMA
-# ---------------------------------------------------------------------------
 
 # Propiedades del sudor (aproximadas a solución acuosa diluida)
 VISCOSIDAD_SUDOR_Pa_s = 1.0e-3      # ~agua a 37°C [Pa·s]
 DENSIDAD_SUDOR_kg_m3 = 1005.0       # ~agua con solutos [kg/m³]
 DIFUSIVIDAD_GLUCOSA_m2_s = 6.7e-10  # coeficiente de difusión glucosa en agua
-                                     # a 37°C (Khalil et al., 2006)
+                                    # a 37°C (Khalil et al., 2006)
 
 
 class ModeloMicrofluido:
@@ -49,7 +43,6 @@ class ModeloMicrofluido:
     modificables para el análisis paramétrico.
 
     Parámetros
-    ----------
     ancho_um : float
         Ancho del microcanal [µm]. Típico: 50 – 500 µm.
     alto_um : float
@@ -61,17 +54,17 @@ class ModeloMicrofluido:
     """
 
     def __init__(self,
-                 ancho_um: float = 200.0,
-                 alto_um: float = 50.0,
-                 largo_mm: float = 5.0,
-                 caudal_nL_min: float = 10.0):
+                ancho_um: float = 200.0,
+                alto_um: float = 50.0,
+                largo_mm: float = 5.0,
+                caudal_nL_min: float = 10.0):
 
         self.ancho_um = ancho_um
         self.alto_um = alto_um
         self.largo_mm = largo_mm
         self.caudal_nL_min = caudal_nL_min
 
-    # --- Propiedades derivadas ------------------------------------------------
+    # Propiedades derivadas 
 
     @property
     def ancho_m(self) -> float:
@@ -93,7 +86,7 @@ class ModeloMicrofluido:
     def caudal_m3_s(self) -> float:
         return self.caudal_nL_min * 1e-9 / 60.0  # nL/min → m³/s
 
-    # --- Métodos del modelo ---------------------------------------------------
+    # Métodos del modelo 
 
     def velocidad_media_m_s(self) -> float:
         """Velocidad media del fluido en el microcanal [m/s]."""
@@ -147,8 +140,8 @@ class ModeloMicrofluido:
         return np.sqrt(2 * DIFUSIVIDAD_GLUCOSA_m2_s * t_r) * 1e3
 
     def concentracion_efectiva_zona_optica(self,
-                                           concentracion_entrada_mM: float
-                                           ) -> float:
+                                        concentracion_entrada_mM: float
+                                        ) -> float:
         """
         Concentración efectiva estimada en la zona de detección óptica [mM].
 

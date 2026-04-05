@@ -30,9 +30,7 @@ class TestSensorNIR(unittest.TestCase):
         """Limpieza de archivos después de cada prueba."""
         shutil.rmtree(self.test_dir)
 
-    # =========================================================================
     # PRUEBAS DEL MODELO ÓPTICO (Ley de Beer-Lambert)
-    # =========================================================================
 
     def test_absorbancia_positiva(self):
         """Prueba que el cálculo de absorbancia no devuelva valores negativos absurdos."""
@@ -65,10 +63,8 @@ class TestSensorNIR(unittest.TestCase):
         self.assertEqual(len(C_vec), len(A_vec), "El vector de salida no coincide con el de entrada")
         self.assertIsInstance(A_vec, np.ndarray)
 
-    # =========================================================================
     # PRUEBAS DEL MODELO MICROFLUÍDICO
-    # =========================================================================
-
+    
     def test_regimen_laminar(self):
         """Prueba que el flujo calculado se mantenga en régimen laminar (Re < 1)."""
         reynolds = self.modelo_mf.numero_reynolds()
@@ -84,9 +80,7 @@ class TestSensorNIR(unittest.TestCase):
         self.assertIn("numero_reynolds", params)
         self.assertIn("tiempo_residencia_s", params)
 
-    # =========================================================================
     # PRUEBAS DEL MOTOR DE SIMULACIÓN Y EXPORTACIÓN
-    # =========================================================================
 
     def test_simulacion_parametrica_ejecucion(self):
         """Prueba que la simulación se ejecute y genere DataFrames."""
