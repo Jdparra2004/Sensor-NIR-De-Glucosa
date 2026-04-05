@@ -492,7 +492,7 @@ class AppGlucosaNIR(tk.Tk):
         # 3. Si eligió una carpeta válida, procedemos con la simulación y guardado
         try:
             self.var_estado.set("Simulando y exportando... por favor espere.")
-            self.root.update()  # Fuerza a la interfaz a mostrar el texto antes de congelarse por el cálculo
+            self.update()  # Fuerza a la interfaz a mostrar el texto antes de congelarse por el cálculo
             
             sim = SimulacionParametrica()
             sim.ejecutar_todas()
