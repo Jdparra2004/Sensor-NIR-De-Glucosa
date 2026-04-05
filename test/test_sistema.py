@@ -24,7 +24,7 @@ class TestSensorNIR(unittest.TestCase):
         
         # Instanciar modelos con valores típicos
         self.modelo_optico = ModeloBeerLambertNIR(longitud_optica_mm=1.0)
-        self.modelo_mf = ModeloMicrofluido(ancho_um=200.0, alto_um=50.0, largo_mm=5.0, caudal_nL_min=10.0)
+        self.modelo_mf = ModeloMicrofluido(ancho_um=200.0, alto_um=50.0, largo_mm=5.0, caudal_nL_min=5.0)
 
     def tearDown(self):
         """Limpieza de archivos después de cada prueba."""
