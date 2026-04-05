@@ -5,6 +5,10 @@ import os
 import tempfile
 import shutil
 from pathlib import Path
+import sys
+
+# Agrega el directorio raíz del proyecto al path de Python
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # Importamos las clases de tu código base
 from core.modelo_optico import ModeloBeerLambertNIR, LAMBDA_REFERENCIA_NM
