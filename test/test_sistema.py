@@ -96,20 +96,25 @@ class TestSensorNIR(unittest.TestCase):
         self.assertFalse(primer_df.empty)
 
     def test_exportar_resultados(self):
-        """Prueba que se creen los archivos CSV y JSON en la carpeta indicada."""
+        """Prueba que se creen los archivos CSV y JSON en la carpeta de Descargas."""
         sim = SimulacionParametrica()
         sim.ejecutar_todas()
         
-        # Forzar la exportación a nuestra carpeta temporal segura
-        sim.exportar_resultados(carpeta=self.test_dir)
+        # Buscamos la ruta de Descargas (Downloads) de tu usuario automáticamente
+        carpeta_descargas = Path.home() / "Downloads" / "Test_Sensor_NIR"
         
-        archivos_creados = os.listdir(self.test_dir)
+        # Forzamos la exportación a esa carpeta en Descargas
+        sim.exportar_resultados(carpeta=str(carpeta_descargas))
+        
+        archivos_creados = os.listdir(carpeta_descargas)
         
         # Verificamos que se haya creado al menos un archivo
-        self.assertTrue(len(archivos_creados) > 0, "No se exportó ningún archivo")
+        self.assertTrue(len(archivos_creados) > 0, "No se exportó ningún archivo a Descargas")
         
         # Verificamos que se haya guardado el JSON de configuración
         self.assertIn("configuracion_simulacion.json", archivos_creados)
+        
+        print(f"\n[OK] Ve a revisar tus archivos de prueba reales en: {carpeta_descargas}")
 
 if __name__ == '__main__':
     unittest.main()
