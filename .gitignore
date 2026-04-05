@@ -1,0 +1,11 @@
+# Archivos de caché de Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Carpetas de resultados de tus simulaciones (no se deben subir a GitHub)
+outputs/
+
+# Archivos temporales de pruebas (si usas pytest u otros)
+.pytest_cache/
