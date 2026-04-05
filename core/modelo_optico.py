@@ -216,23 +216,27 @@ class ModeloBeerLambertNIR:
     def concentracion_inversa(self, absorbancia: float, lambda_nm: float = LAMBDA_REFERENCIA_NM) -> float:
         """
         Calcula la concentración de glucosa en el sudor [mM] a partir de una absorbancia medida.
-        Resuelve analíticamente la ecuación de Beer-Lambert con desplazamiento de agua.
+        Resuelve analíticamente la ecuación directa usada en _calcular_A_en_lambda.
         """
-        L = self.longitud_optica
-        eps_glu = self._abs_glucosa(lambda_nm)
-        eps_agua = self._abs_agua(lambda_nm)
+        L = self.longitud_optica_mm
+        
+        # Obtenemos los coeficientes usando el método de interpolación de tu clase
+        eps_g = self._interpolar(ABSORPTIVIDAD_GLUCOSA, lambda_nm)
+        eps_w = self._interpolar(ABSORPTIVIDAD_AGUA, lambda_nm)
         
         if self.incluir_desplazamiento_agua:
-            # Despeje de la ecuación con efecto de desplazamiento de volumen
-            numerador = absorbancia - (eps_agua * self.C_agua_pura * L)
-            denominador = L * (eps_glu - self.V_molar_glucosa * eps_agua)
+            # Despejando C de la fórmula: A = (eps_g * C * L) - (eps_w * COEF * C * C_AGUA * L)
+            # Factorizamos C: A = C * [L * (eps_g - eps_w * COEF * C_AGUA)]
+            denominador = L * (eps_g - eps_w * COEF_DESPLAZAMIENTO_AGUA * CONCENTRACION_AGUA)
         else:
-            # Despeje de la ley de Beer-Lambert clásica
-            numerador = absorbancia - (eps_agua * self.C_agua_pura * L)
-            denominador = eps_glu * L
+            # Despejando C de la fórmula clásica: A = eps_g * C * L
+            denominador = L * eps_g
             
-        C_calculada = numerador / denominador
-        return max(0.0, C_calculada) # Evitamos concentraciones negativas por ruido
+        if denominador == 0:
+            return 0.0
+            
+        C_calculada = absorbancia / denominador
+        return max(0.0, C_calculada) # Evita concentraciones negativas por ruido
 
     def evaluar_riesgo_clinico(self, concentracion_mM: float) -> str:
         """
