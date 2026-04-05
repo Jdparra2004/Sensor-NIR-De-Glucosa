@@ -165,6 +165,9 @@ class AppGlucosaNIR(tk.Tk):
         self.var_caudal = self._slider_param(
             p, "Caudal [nL/min]", 1, 100, 10, step=1)
 
+        # Llamar al nuevo panel clínico 
+        self._crear_panel_clinico(p)
+        
         ttk.Separator(p, orient="horizontal").pack(fill="x", padx=10, pady=6)
 
         # Botones 
@@ -415,6 +418,61 @@ class AppGlucosaNIR(tk.Tk):
         except Exception as e:
             self.var_estado.set(f"Error: {e}")
             messagebox.showerror("Error de simulación", str(e))
+    
+    def _crear_panel_clinico(self, parent_frame):
+        """Crea la sección de Análisis Clínico en la interfaz."""
+        frame_clinico = ttk.LabelFrame(parent_frame, text="Análisis Clínico y Diagnóstico", padding="10")
+        # Se ubica al final de los controles
+        frame_clinico.pack(fill="x", padx=10, pady=10)
+
+        # Instrucción
+        ttk.Label(frame_clinico, text="Ingrese la Absorbancia (A) medida por el sensor:").grid(row=0, column=0, columnspan=2, sticky="w", pady=5)
+
+        # Campo de entrada de Absorbancia
+        self.var_absorbancia_input = tk.DoubleVar(value=0.0025) 
+        ttk.Entry(frame_clinico, textvariable=self.var_absorbancia_input, width=15).grid(row=1, column=0, sticky="w", padx=5)
+
+        # Botón de análisis
+        ttk.Button(frame_clinico, text="Analizar Muestra", command=self._ejecutar_analisis_clinico).grid(row=1, column=1, sticky="w")
+
+        # Resultados
+        self.var_resultado_concentracion = tk.StringVar(value="Concentración estimada: -- mM")
+        self.var_resultado_diagnostico = tk.StringVar(value="Diagnóstico: --")
+        
+        lbl_conc = ttk.Label(frame_clinico, textvariable=self.var_resultado_concentracion, font=("Helvetica", 10, "bold"))
+        lbl_conc.grid(row=2, column=0, columnspan=2, sticky="w", pady=(10, 0))
+        
+        lbl_diag = ttk.Label(frame_clinico, textvariable=self.var_resultado_diagnostico, font=("Helvetica", 11, "bold"))
+        lbl_diag.grid(row=3, column=0, columnspan=2, sticky="w", pady=5)
+
+    def _ejecutar_analisis_clinico(self):
+        """Lógica que se ejecuta al presionar 'Analizar Muestra'."""
+        try:
+            absorbancia = self.var_absorbancia_input.get()
+            
+            # Instanciamos el modelo con la longitud óptica configurada en la UI
+            L_optica = self.var_longitud_optica.get()
+            lambda_nm = self.var_lambda.get()
+            
+            modelo = ModeloBeerLambertNIR(longitud_optica_mm=L_optica)
+            
+            # Calculamos la inversa
+            concentracion = modelo.concentracion_inversa(absorbancia, lambda_nm=lambda_nm)
+            diagnostico = modelo.evaluar_riesgo_clinico(concentracion)
+            
+            # Actualizamos la interfaz
+            self.var_resultado_concentracion.set(f"Concentración estimada: {concentracion:.4f} mM")
+            
+            # Cambiamos el texto y el color según el riesgo
+            if "Alta" in diagnostico:
+                self.var_resultado_diagnostico.set(f"🚨 {diagnostico}")
+            elif "Riesgo" in diagnostico:
+                self.var_resultado_diagnostico.set(f"⚠️ {diagnostico}")
+            else:
+                self.var_resultado_diagnostico.set(f"✅ {diagnostico}")
+
+        except Exception as e:
+            messagebox.showerror("Error de Cálculo", f"Verifique los datos ingresados.\nDetalle: {e}")
 
     def _exportar(self):
         """Exporta todas las simulaciones a CSV en una carpeta elegida por el usuario."""

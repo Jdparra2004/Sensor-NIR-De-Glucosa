@@ -188,7 +188,7 @@ class ModeloBeerLambertNIR:
             Vector de absorbancias correspondiente.
         """
         return np.array([self.absorbancia(C, lambda_nm)
-                         for C in concentraciones_mM])
+                        for C in concentraciones_mM])
 
     def espectro_completo(self, concentracion_mM: float) -> tuple:
         """
@@ -212,3 +212,37 @@ class ModeloBeerLambertNIR:
         A_mas = self.absorbancia(C_ref + dC, lambda_nm)
         A_menos = self.absorbancia(C_ref - dC, lambda_nm)
         return (A_mas - A_menos) / (2 * dC)
+    
+    def concentracion_inversa(self, absorbancia: float, lambda_nm: float = LAMBDA_REFERENCIA_NM) -> float:
+        """
+        Calcula la concentración de glucosa en el sudor [mM] a partir de una absorbancia medida.
+        Resuelve analíticamente la ecuación de Beer-Lambert con desplazamiento de agua.
+        """
+        L = self.longitud_optica
+        eps_glu = self._abs_glucosa(lambda_nm)
+        eps_agua = self._abs_agua(lambda_nm)
+        
+        if self.incluir_desplazamiento_agua:
+            # Despeje de la ecuación con efecto de desplazamiento de volumen
+            numerador = absorbancia - (eps_agua * self.C_agua_pura * L)
+            denominador = L * (eps_glu - self.V_molar_glucosa * eps_agua)
+        else:
+            # Despeje de la ley de Beer-Lambert clásica
+            numerador = absorbancia - (eps_agua * self.C_agua_pura * L)
+            denominador = eps_glu * L
+            
+        C_calculada = numerador / denominador
+        return max(0.0, C_calculada) # Evitamos concentraciones negativas por ruido
+
+    def evaluar_riesgo_clinico(self, concentracion_mM: float) -> str:
+        """
+        Clasifica el nivel de glucosa en el sudor según umbrales fisiológicos aproximados.
+        """
+        if concentracion_mM < 0.01:
+            return "Indetectable (Fuera de rango o error de lectura)"
+        elif concentracion_mM <= 0.2:
+            return "Nivel Normal (Normoglucemia probable)"
+        elif concentracion_mM <= 0.4:
+            return "Nivel Elevado (Riesgo de prediabetes, requiere monitoreo)"
+        else:
+            return "Nivel Muy Alto (Alta probabilidad de hiperglucemia / Diabetes Tipo II)"

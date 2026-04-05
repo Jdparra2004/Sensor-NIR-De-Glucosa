@@ -116,5 +116,49 @@ class TestSensorNIR(unittest.TestCase):
         
         print(f"\n[OK] Ve a revisar tus archivos de prueba reales en: {carpeta_descargas}")
 
+    # PRUEBAS DE ANÁLISIS CLÍNICO E INFERENCIA INVERSA
+
+    def test_concentracion_inversa_matematica(self):
+        """
+        Validación de parámetros: Prueba que el cálculo inverso devuelva la 
+        concentración original a partir de una absorbancia calculada.
+        """
+        C_original = 0.15 # mM
+        
+        # 1. Calculamos la Absorbancia de una concentración conocida
+        A_calculada = self.modelo_optico.absorbancia(C_original, LAMBDA_REFERENCIA_NM)
+        
+        # 2. Le pasamos esa Absorbancia a la nueva función inversa
+        C_inversa = self.modelo_optico.concentracion_inversa(A_calculada, LAMBDA_REFERENCIA_NM)
+        
+        # 3. Validamos que la C_inversa sea casi idéntica a la C_original (5 decimales de precisión)
+        self.assertAlmostEqual(C_original, C_inversa, places=5, msg="El cálculo de la concentración inversa falló")
+
+    def test_diagnostico_clinico_tres_casos(self):
+        """
+        Prueba los 3 escenarios clínicos posibles:
+        - No diabetes (Normal)
+        - Tal vez diabetes (Riesgo / Prediabetes)
+        - Sí diabetes (Muy Alto / Hiperglucemia)
+        """
+        # Caso 1: NO Diabetes -> Nivel Normal (<= 0.2 mM)
+        diag_normal = self.modelo_optico.evaluar_riesgo_clinico(0.1)
+        self.assertIn("Nivel Normal", diag_normal, "Falló la clasificación de caso Normal")
+        
+        # Caso 2: TAL VEZ Diabetes -> Nivel Elevado (0.2 a 0.4 mM)
+        diag_riesgo = self.modelo_optico.evaluar_riesgo_clinico(0.3)
+        self.assertIn("Nivel Elevado", diag_riesgo, "Falló la clasificación de caso de Riesgo")
+        
+        # Caso 3: SÍ Diabetes -> Nivel Muy Alto (> 0.4 mM)
+        diag_alto = self.modelo_optico.evaluar_riesgo_clinico(0.8)
+        self.assertIn("Nivel Muy Alto", diag_alto, "Falló la clasificación de caso de Diabetes")
+
+    def test_diagnostico_valores_extremos(self):
+        """
+        Prueba cómo reacciona el sistema ante valores absurdos o bajo el límite de detección.
+        """
+        diag_indetectable = self.modelo_optico.evaluar_riesgo_clinico(-0.05)
+        self.assertIn("Indetectable", diag_indetectable, "El sistema no manejó correctamente valores por debajo de 0.01")
+
 if __name__ == '__main__':
     unittest.main()
