@@ -19,7 +19,7 @@ Uso:
 
 import sys
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk, messagebox, filedialog
 from pathlib import Path
 
 import numpy as np
@@ -417,16 +417,36 @@ class AppGlucosaNIR(tk.Tk):
             messagebox.showerror("Error de simulación", str(e))
 
     def _exportar(self):
-        """Exporta todas las simulaciones a CSV."""
+        """Exporta todas las simulaciones a CSV en una carpeta elegida por el usuario."""
+        # 1. Abrir ventana para que el usuario elija la carpeta de destino
+        carpeta_destino = filedialog.askdirectory(
+            title="Seleccionar carpeta para guardar los resultados"
+        )
+        
+        # 2. Si el usuario cierra la ventana o le da a "Cancelar", detenemos la acción
+        if not carpeta_destino:
+            return
+
+        # 3. Si eligió una carpeta válida, procedemos con la simulación y guardado
         try:
+            self.var_estado.set("Simulando y exportando... por favor espere.")
+            self.root.update()  # Fuerza a la interfaz a mostrar el texto antes de congelarse por el cálculo
+            
             sim = SimulacionParametrica()
             sim.ejecutar_todas()
-            sim.exportar_resultados("outputs")
-            messagebox.showinfo("Exportación exitosa",
-                                "Resultados guardados en la carpeta 'outputs/'")
-            self.var_estado.set("Resultados exportados en outputs/")
+            
+            # Pasamos la ruta elegida por el usuario a tu núcleo lógico
+            sim.exportar_resultados(carpeta=carpeta_destino)
+            
+            messagebox.showinfo(
+                "Exportación exitosa",
+                f"Todos los archivos fueron guardados exitosamente en:\n{carpeta_destino}"
+            )
+            self.var_estado.set("Listo. Resultados exportados.")
+            
         except Exception as e:
             messagebox.showerror("Error de exportación", str(e))
+            self.var_estado.set("Error durante la exportación.")
 
     def _restablecer(self):
         """Restablece todos los parámetros a sus valores por defecto."""
