@@ -9,3 +9,10 @@ outputs/
 
 # Archivos temporales de pruebas (si usas pytest u otros)
 .pytest_cache/
+
+# Carpetas de PyInstaller (compilación)
+build/
+dist/
+
+# Archivos de especificación de PyInstaller
+*.spec
