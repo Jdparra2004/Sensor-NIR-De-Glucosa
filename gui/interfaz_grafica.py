@@ -32,7 +32,7 @@ from matplotlib.figure import Figure
 # Agregar el directorio raíz al path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from core.modelo_optico import ModeloBeerLambertNIR
+from core.modelo_optico import ModeloBeerLambertNIR, ABSORPTIVIDAD_GLUCOSA, ABSORPTIVIDAD_AGUA
 from core.modelo_microfluido import ModeloMicrofluido
 from core.simulacion_parametrica import SimulacionParametrica
 
@@ -418,62 +418,114 @@ class AppGlucosaNIR(tk.Tk):
                 f"Simulación completada  |  λ={lambda_nm:.0f} nm  |  "
                 f"L={L:.2f} mm  |  C∈[{C_min:.3f}, {C_max:.2f}] mM  |  Re={Re:.4f}"
             )
+            
+            self._ejecutar_analisis_clinico()
 
         except Exception as e:
             self.var_estado.set(f"Error: {e}")
             messagebox.showerror("Error de simulación", str(e))
     
     def _crear_panel_clinico(self, parent_frame):
-        """Crea la sección de Análisis Clínico en la interfaz."""
-        frame_clinico = ttk.LabelFrame(parent_frame, text="Análisis Clínico y Diagnóstico", padding="10")
-        # Se ubica al final de los controles
-        frame_clinico.pack(fill="x", padx=10, pady=10)
+        """Crea el Dashboard Médico en la pestaña 5."""
+        frame_controles = tk.Frame(parent_frame, bg=COLOR_BG)
+        frame_controles.pack(side="top", fill="x", padx=10, pady=10)
 
-        # Instrucción
-        ttk.Label(frame_clinico, text="Ingrese la Absorbancia (A) medida por el sensor:").grid(row=0, column=0, columnspan=2, sticky="w", pady=5)
-
-        # Campo de entrada de Absorbancia
-        self.var_absorbancia_input = tk.DoubleVar(value=0.0025) 
-        ttk.Entry(frame_clinico, textvariable=self.var_absorbancia_input, width=15).grid(row=1, column=0, sticky="w", padx=5)
-
-        # Botón de análisis
-        ttk.Button(frame_clinico, text="Analizar Muestra", command=self._ejecutar_analisis_clinico).grid(row=1, column=1, sticky="w")
-
-        # Resultados
-        self.var_resultado_concentracion = tk.StringVar(value="Concentración estimada: -- mM")
-        self.var_resultado_diagnostico = tk.StringVar(value="Diagnóstico: --")
+        ttk.Label(frame_controles, text="Absorbancia Medida (A):", font=("Helvetica", 10)).pack(side="left", padx=5)
         
-        lbl_conc = ttk.Label(frame_clinico, textvariable=self.var_resultado_concentracion, font=("Helvetica", 10, "bold"))
-        lbl_conc.grid(row=2, column=0, columnspan=2, sticky="w", pady=(10, 0))
+        # OJO: Puse un valor realista por defecto (0.000025) para que dé una concentración de ~0.4 mM
+        self.var_absorbancia_input = tk.DoubleVar(value=0.000025) 
         
-        lbl_diag = ttk.Label(frame_clinico, textvariable=self.var_resultado_diagnostico, font=("Helvetica", 11, "bold"))
-        lbl_diag.grid(row=3, column=0, columnspan=2, sticky="w", pady=5)
+        entrada_abs = ttk.Entry(frame_controles, textvariable=self.var_absorbancia_input, width=15)
+        entrada_abs.pack(side="left", padx=5)
+        
+        # ¡NUEVO! Permitir que la gráfica se actualice al presionar la tecla Enter
+        entrada_abs.bind("<Return>", lambda event: self._ejecutar_analisis_clinico())
+
+        ttk.Button(frame_controles, text="🔍 Generar Diagnóstico Médico", command=self._ejecutar_analisis_clinico).pack(side="left", padx=15)
+
+        self.var_resultado_diagnostico = tk.StringVar(value="Ingrese un valor y analice la muestra...")
+        lbl_diag = ttk.Label(frame_controles, textvariable=self.var_resultado_diagnostico, font=("Helvetica", 11, "bold"))
+        lbl_diag.pack(side="left", padx=10)
+
+        self._fig5, self._axes5 = self._nueva_figura(parent_frame, subplots=(2, 1))
 
     def _ejecutar_analisis_clinico(self):
-        """Lógica que se ejecuta al presionar 'Analizar Muestra'."""
+        """Calcula la concentración, evalúa el riesgo y dibuja el dashboard interactivo."""
         try:
-            absorbancia = self.var_absorbancia_input.get()
-            
-            # Instanciamos el modelo con la longitud óptica configurada en la UI
+            absorbancia_ingresada = self.var_absorbancia_input.get()
             L_optica = self.var_longitud_optica.get()
             lambda_nm = self.var_lambda.get()
             
             modelo = ModeloBeerLambertNIR(longitud_optica_mm=L_optica)
             
-            # Calculamos la inversa
-            concentracion = modelo.concentracion_inversa(absorbancia, lambda_nm=lambda_nm)
+            # 1. MATEMÁTICA ROBUSTA
+            eps_g = modelo._interpolar(ABSORPTIVIDAD_GLUCOSA, lambda_nm)
+            eps_w = modelo._interpolar(ABSORPTIVIDAD_AGUA, lambda_nm)
+            
+            if modelo.incluir_desplazamiento_agua:
+                denominador = L_optica * (eps_g - eps_w * 6.15)
+            else:
+                denominador = L_optica * eps_g
+                
+            # Usamos abs() para que el desplazamiento de agua no rompa la app al meter señales positivas
+            concentracion = abs(absorbancia_ingresada / denominador) if denominador != 0 else 0.0
+            
             diagnostico = modelo.evaluar_riesgo_clinico(concentracion)
             
-            # Actualizamos la interfaz
-            self.var_resultado_concentracion.set(f"Concentración estimada: {concentracion:.4f} mM")
-            
-            # Cambiamos el texto y el color según el riesgo
+            # --- 2. ACTUALIZACIÓN DE TEXTO ---
             if "Alta" in diagnostico:
-                self.var_resultado_diagnostico.set(f"🚨 {diagnostico}")
+                self.var_resultado_diagnostico.set(f"🚨 {diagnostico} (C = {concentracion:.3f} mM)")
             elif "Riesgo" in diagnostico:
-                self.var_resultado_diagnostico.set(f"⚠️ {diagnostico}")
+                self.var_resultado_diagnostico.set(f"⚠️ {diagnostico} (C = {concentracion:.3f} mM)")
             else:
-                self.var_resultado_diagnostico.set(f"✅ {diagnostico}")
+                self.var_resultado_diagnostico.set(f"✅ {diagnostico} (C = {concentracion:.3f} mM)")
+
+            # --- 3. DIBUJO DE GRÁFICAS ---
+            ax_semaforo, ax_incertidumbre = self._axes5
+            ax_semaforo.clear()
+            ax_incertidumbre.clear()
+
+            # Escala dinámica: si la C es gigante (por si metes 0.4 de absorbancia), no aplastamos el gráfico
+            lim_x = max(0.6, concentracion * 1.3)
+
+            # Gráfico 1: Semáforo
+            ax_semaforo.axvspan(0, 0.2, color='#A8E6CF', alpha=0.5, label='Normal (<= 0.2 mM)')
+            ax_semaforo.axvspan(0.2, 0.4, color='#FFD3B6', alpha=0.6, label='Prediabetes (0.2 - 0.4 mM)')
+            ax_semaforo.axvspan(0.4, lim_x, color='#FFAAA5', alpha=0.5, label='Hiperglucemia (> 0.4 mM)')
+
+            ax_semaforo.axvline(concentracion, color='#1A2E40', lw=3)
+            ax_semaforo.plot(concentracion, 0, marker='v', color='#1A2E40', markersize=14, label=f'Paciente: {concentracion:.3f} mM')
+
+            ax_semaforo.set_xlim(0, lim_x)
+            ax_semaforo.set_yticks([]) 
+            ax_semaforo.set_title('Clasificación de Riesgo Clínico', fontsize=11, fontweight='bold', color="#1A2E40")
+            ax_semaforo.legend(loc='upper right', fontsize=8)
+
+            # Gráfico 2: Incertidumbre
+            ruido = 0.05
+            c_min = concentracion * (1 - ruido)
+            c_max = concentracion * (1 + ruido)
+
+            x = np.linspace(max(0, c_min - 0.1), c_max + 0.1, 200)
+            sigma = (c_max - c_min) / 4 if c_max > c_min else 0.001
+            y = np.exp(-0.5 * ((x - concentracion) / sigma)**2)
+
+            ax_incertidumbre.plot(x, y, color='#2E86AB', lw=2)
+            ax_incertidumbre.fill_between(x, y, alpha=0.3, color='#2E86AB')
+            
+            ax_incertidumbre.axvline(concentracion, color='red', ls='--', lw=1.5, label='Valor Central')
+            ax_incertidumbre.axvline(c_min, color='#555555', ls=':', lw=1.5, label=f'Mínimo ({c_min:.3f})')
+            ax_incertidumbre.axvline(c_max, color='#555555', ls=':', lw=1.5, label=f'Máximo ({c_max:.3f})')
+
+            ax_incertidumbre.set_xlim(0, lim_x) 
+            ax_incertidumbre.set_yticks([])
+            ax_incertidumbre.set_xlabel('Concentración Estimada de Glucosa en Sudor [mM]', fontsize=10)
+            ax_incertidumbre.set_title('Análisis de Incertidumbre (±5% de ruido óptico)', fontsize=11, fontweight='bold', color="#1A2E40")
+            ax_incertidumbre.legend(loc='upper right', fontsize=8)
+
+            # Refrescar lienzo de Tkinter
+            self._fig5.tight_layout()
+            self._fig5._canvas.draw()
 
         except Exception as e:
             messagebox.showerror("Error de Cálculo", f"Verifique los datos ingresados.\nDetalle: {e}")
