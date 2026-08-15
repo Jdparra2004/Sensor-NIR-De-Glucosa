@@ -16,3 +16,6 @@ dist/
 
 # Archivos de especificación de PyInstaller
 *.spec
+
+#Graphify
+graphify-out/
