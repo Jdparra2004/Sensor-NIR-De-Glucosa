@@ -1,5 +1,5 @@
 
-# Simulador NIR-Glucosa — Bioingeniería UPB
+# Simulador NIR-Glucosa — Bioingeniería 
 
 **Evaluación paramétrica de un modelo matemático para el monitoreo no invasivo de glucosa en el sudor, mediante simulación numérica computacional basada en detección óptica de infrarrojo cercano (NIR).**
 
