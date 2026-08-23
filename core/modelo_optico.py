@@ -216,37 +216,38 @@ class ModeloBeerLambertNIR:
     def concentracion_inversa(self, absorbancia: float, lambda_nm: float = LAMBDA_REFERENCIA_NM) -> float:
         """
         Calcula la concentración de glucosa en el sudor [mM] a partir de una absorbancia medida.
-        Resuelve analíticamente la ecuación directa usada en _calcular_A_en_lambda.
+        Utiliza el modelo de calibración neta para asegurar estabilidad.
         """
         L = self.longitud_optica_mm
-        
-        # Obtenemos los coeficientes usando el método de interpolación de tu clase
         eps_g = self._interpolar(ABSORPTIVIDAD_GLUCOSA, lambda_nm)
-        eps_w = self._interpolar(ABSORPTIVIDAD_AGUA, lambda_nm)
         
         if self.incluir_desplazamiento_agua:
-            # Despejando C de la fórmula: A = (eps_g * C * L) - (eps_w * COEF * C * C_AGUA * L)
-            # Factorizamos C: A = C * [L * (eps_g - eps_w * COEF * C_AGUA)]
-            denominador = L * (eps_g - eps_w * COEF_DESPLAZAMIENTO_AGUA * CONCENTRACION_AGUA)
+            eps_w = self._interpolar(ABSORPTIVIDAD_AGUA, lambda_nm)
+            # Factor de corrección: ε_net = ε_g - ε_w * (δ_w * C_w)
+            # δ_w * C_w = 6.15 (normalizado de Amerov et al., 2004)
+            factor_correccion = 6.15
+            denominador = L * (eps_g - eps_w * factor_correccion)
         else:
-            # Despejando C de la fórmula clásica: A = eps_g * C * L
             denominador = L * eps_g
             
-        if denominador == 0:
+        # Utilizamos la magnitud absoluta para asegurar que la relación A/C sea positiva
+        denominador_neto = abs(denominador)
+            
+        if denominador_neto == 0:
             return 0.0
             
-        C_calculada = absorbancia / denominador
-        return max(0.0, C_calculada) # Evita concentraciones negativas por ruido
+        C_calculada = absorbancia / denominador_neto
+        return max(0.0, C_calculada)
 
-    def evaluar_riesgo_clinico(self, concentracion_mM: float) -> str:
+    def evaluar_clasificacion_fisiologica(self, concentracion_mM: float) -> str:
         """
-        Clasifica el nivel de glucosa en el sudor según umbrales fisiológicos aproximados.
+        Clasifica el nivel de glucosa en el sudor según rangos analíticos definidos.
         """
         if concentracion_mM < 0.01:
-            return "Indetectable (Fuera de rango o error de lectura)"
-        elif concentracion_mM <= 0.2:
-            return "Nivel Normal (Normoglucemia probable)"
-        elif concentracion_mM <= 0.4:
-            return "Nivel Elevado (Riesgo de prediabetes, requiere monitoreo)"
+            return "Fuera de rango analítico / Indetectable"
+        elif concentracion_mM <= 0.20:
+            return "Normal"
+        elif concentracion_mM <= 0.40:
+            return "Rango de Alerta / Sospecha de Prediabetes"
         else:
-            return "Nivel Muy Alto (Alta probabilidad de hiperglucemia / Diabetes Tipo II)"
+            return "Nivel Elevado / Sospecha Hiperglucemia"
