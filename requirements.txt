@@ -1,4 +1,8 @@
+# Dependencias base para modelos matemáticos y análisis
 numpy>=1.24.0
 pandas>=2.0.0
 matplotlib>=3.7.0
-# tkinter viene incluido con Python estándar
+
+# Dependencias para la nueva interfaz web (Streamlit)
+streamlit>=1.25.0
+plotly>=5.15.0
