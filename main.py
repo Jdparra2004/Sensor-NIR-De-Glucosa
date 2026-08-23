@@ -18,13 +18,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 
-def modo_gui():
-    """Lanza la interfaz gráfica interactiva."""
-    from gui.interfaz_grafica import IniciarGUI
-    print("Iniciando interfaz gráfica...")
-    IniciarGUI()
-
-
 def modo_consola():
     """Ejecuta las simulaciones en consola y muestra resultados básicos."""
     import numpy as np
@@ -107,4 +100,4 @@ if __name__ == "__main__":
     elif args.consola:
         modo_consola()
     else:
-        modo_gui()
+        print("Modo no reconocido. Use --consola o --exportar.")
