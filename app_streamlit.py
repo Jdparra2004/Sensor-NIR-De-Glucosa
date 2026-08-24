@@ -14,7 +14,7 @@ from core.modelo_microfluido import ModeloMicrofluido
 
 st.set_page_config(page_title="Biosensor NIR - Glucosa en Sudor", layout="wide")
 
-# Configuración estándar para colocar la leyenda abajo y centrada
+# Configuración estándar de leyenda fija inferior
 LEYENDA_INFERIOR = dict(
     orientation="h",
     yanchor="top",
@@ -45,21 +45,17 @@ def aplicar_ruido(valor):
     return valor * np.random.uniform(0.95, 1.05) if noise_instrumental else valor
 
 def generar_excel_multihoja(df_resultado, lambda_val, L_val):
-    """Genera un archivo Excel estructurado en memoria con múltiples hojas de análisis."""
+    """Genera un archivo Excel estructurado en memoria con múltiples hojas."""
     output = io.BytesIO()
-    
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        # Hoja 1: Datos Detallados
         df_resultado.to_excel(writer, sheet_name='Datos_Procesados', index=False)
         
-        # Hoja 2: Distribución y Frecuencia Clínica
         if "Clasificación_Metabólica" in df_resultado.columns:
             conteo = df_resultado["Clasificación_Metabólica"].value_counts().reset_index()
             conteo.columns = ["Categoría Fisiológica", "Total Muestras"]
             conteo["Porcentaje (%)"] = (conteo["Total Muestras"] / len(df_resultado) * 100).round(2)
             conteo.to_excel(writer, sheet_name='Resumen_Clasificacion', index=False)
         
-        # Hoja 3: Parámetros del Ensayo Óptico
         metricas = {
             "Parámetro": [
                 "Longitud de onda aplicada (λ)",
@@ -104,6 +100,7 @@ with tab1:
         title="Absorbancia neta vs Concentración",
         xaxis_title="C [mM]",
         yaxis_title="A [u.a.]",
+        height=380,
         showlegend=True,
         legend=LEYENDA_INFERIOR
     )
@@ -117,18 +114,20 @@ with tab1:
         title="Espectro NIR",
         xaxis_title="λ [nm]",
         yaxis_title="A [u.a.]",
+        height=380,
         showlegend=True,
         legend=LEYENDA_INFERIOR
     )
     col2.plotly_chart(fig2)
 
-    st.latex(r"A_{\\text{neta}}(\\lambda) = (\epsilon_g(\\lambda) - \epsilon_w(\\lambda) \cdot \delta_w) \cdot C \cdot L")
-    A_actual = modelo_optico.absorbancia(c_sim, lambda_nm)
-    st.info(
-        rf"A λ = {lambda_nm} nm, L = {L_mm} mm y C = {c_sim} mM, la absorbancia neta es de **{A_actual:.5f} u.a.** "
-        rf"La pendiente negativa responde al desplazamiento volumétrico del agua ($\delta_w \approx 6.15$): "
-        rf"al disolverse glucosa, se excluye solvente, disminuyendo la absorción del agua."
-    )
+    with st.container(border=True):
+        st.latex(r"A_{\text{neta}}(\lambda) = \left( \epsilon_g(\lambda) - \epsilon_w(\lambda) \cdot \delta_w \right) \cdot C \cdot L")
+        A_actual = modelo_optico.absorbancia(c_sim, lambda_nm)
+        st.info(
+            rf"A $\lambda = {lambda_nm}\text{{ nm}}$, $L = {L_mm}\text{{ mm}}$ y $C = {c_sim}\text{{ mM}}$, la absorbancia neta es de **{A_actual:.5f} u.a.** "
+            rf"La pendiente negativa responde al desplazamiento volumétrico del agua ($\delta_w \approx 6.15$): "
+            rf"al disolverse glucosa, se excluye solvente, disminuyendo la absorción del agua."
+        )
 
 # Tab 2: Microfluídica
 with tab2:
@@ -144,6 +143,7 @@ with tab2:
         title="Número de Reynolds vs Caudal",
         xaxis_title="Q [nL/min]",
         yaxis_title="Re",
+        height=380,
         showlegend=True,
         legend=LEYENDA_INFERIOR
     )
@@ -155,19 +155,21 @@ with tab2:
         title="Tiempo de residencia vs Caudal",
         xaxis_title="Q [nL/min]",
         yaxis_title="t_r [s]",
+        height=380,
         showlegend=True,
         legend=LEYENDA_INFERIOR
     )
     col2.plotly_chart(fig4)
     
-    st.latex(r"Re = \frac{2\rho Q}{\mu(w+h)} \quad \\text{y} \quad t_r = \frac{V_{\\text{celda}}}{Q}")
-    re_actual = modelo_micro.numero_reynolds()
-    st.info(
-        f"Con Q={Q_nlmin} nL/min, Re = **{re_actual:.6f}** "
-        f"({'Régimen Laminar' if re_actual < 1 else 'Flujo No Laminar'}). "
-        f"Velocidad media: **{modelo_micro.velocidad_media_m_s()*1e6:.2f} µm/s**. "
-        f"Tiempo de residencia: **{modelo_micro.tiempo_residencia_s():.2f} s**."
-    )
+    with st.container(border=True):
+        st.latex(r"Re = \frac{2\rho Q}{\mu(w+h)} \quad \text{y} \quad t_r = \frac{V_{\text{celda}}}{Q}")
+        re_actual = modelo_micro.numero_reynolds()
+        st.info(
+            rf"Con $Q = {Q_nlmin}\text{{ nL/min}}$, $Re = \mathbf{{{re_actual:.6f}}}$ "
+            rf"({'Régimen Laminar' if re_actual < 1 else 'Flujo No Laminar'}). "
+            rf"Velocidad media: **{modelo_micro.velocidad_media_m_s()*1e6:.2f} µm/s**. "
+            rf"Tiempo de residencia: **{modelo_micro.tiempo_residencia_s():.2f} s**."
+        )
 
 # Tab 3: Sensibilidad
 with tab3:
@@ -182,6 +184,7 @@ with tab3:
         title="Sensibilidad vs Camino óptico",
         xaxis_title="L [mm]",
         yaxis_title="dA/dC [mM⁻¹]",
+        height=380,
         showlegend=True,
         legend=LEYENDA_INFERIOR
     )
@@ -193,13 +196,15 @@ with tab3:
         title="Absorbancia vs Camino óptico",
         xaxis_title="L [mm]",
         yaxis_title="A [u.a.]",
+        height=380,
         showlegend=True,
         legend=LEYENDA_INFERIOR
     )
     col2.plotly_chart(fig6)
     
-    st.latex(r"\\text{Sensibilidad} = \frac{\partial A}{\partial C} = (\epsilon_g(\\lambda) - \epsilon_w(\\lambda) \cdot \delta_w) \cdot L")
-    st.info("La sensibilidad aumenta linealmente con el camino óptico L, permitiendo amplificar la señal neta sin afectar la selectividad del desplazamiento del solvente.")
+    with st.container(border=True):
+        st.latex(r"\text{Sensibilidad} = \frac{\partial A}{\partial C} = \left(\epsilon_g(\lambda) - \epsilon_w(\lambda) \cdot \delta_w\right) \cdot L")
+        st.info("La sensibilidad aumenta linealmente con el camino óptico L, permitiendo amplificar la señal neta sin afectar la selectividad del desplazamiento del solvente.")
 
 # Tab 4: Inferencia
 with tab4:
@@ -212,11 +217,10 @@ with tab4:
     st.markdown("---")
     st.subheader("Procesamiento por Lotes")
     
-    # Explicación de estructura del archivo y acoplamiento con el sidebar
     with st.expander("ℹ️ Guía de formato para el archivo CSV y parámetros de análisis", expanded=False):
-        st.markdown(f"""
+        st.markdown(rf"""
         **Condiciones de Análisis Activas:**
-        * Los datos del archivo se evalúan en tiempo real con la **Longitud de onda ($\\lambda = {lambda_nm}\\text{{ nm}}$)** y el **Camino óptico ($L = {L_mm}\\text{{ mm}}$)** configurados en la barra lateral (*sidebar*).
+        * Los datos del archivo se evalúan en tiempo real con la **Longitud de onda ($\lambda = {lambda_nm}\text{{ nm}}$)** y el **Camino óptico ($L = {L_mm}\text{{ mm}}$)** configurados en la barra lateral (*sidebar*).
         
         **Estructura y Unidades Requeridas en el CSV:**
         * **Columna de absorbancia (Obligatoria):** Encabezados válidos: `absorbancia_medida`, `absorbancia_1600nm`, `absorbancia_1650nm`, `absorbancia` o `A`. Valores en **u.a.** (unidades de absorbancia neta).
@@ -232,7 +236,6 @@ with tab4:
         estado_texto = progreso_contenedor.empty()
         
         try:
-            # Paso 1: Carga optimizada
             estado_texto.text("Paso 1/4: Leyendo archivo en memoria...")
             barra_progreso.progress(25)
             
@@ -243,7 +246,6 @@ with tab4:
                 uploaded.seek(0)
                 df_lote = pd.read_csv(uploaded, sep=None, engine="python")
             
-            # Paso 2: Detección de columnas
             estado_texto.text("Paso 2/4: Identificando canal óptico de absorbancia...")
             barra_progreso.progress(50)
             time.sleep(0.05)
@@ -262,8 +264,7 @@ with tab4:
                         break
 
             if col_abs is not None:
-                # Paso 3: Cálculo e inferencia
-                estado_texto.text(f"Paso 3/4: Ejecutando inferencia inversa (λ={lambda_nm} nm, L={L_mm} mm)...")
+                estado_texto.text(rf"Paso 3/4: Ejecutando inferencia inversa ($\lambda={lambda_nm}\text{{ nm}}$, $L={L_mm}\text{{ mm}}$)...")
                 barra_progreso.progress(75)
                 
                 valores_abs = pd.to_numeric(df_lote[col_abs], errors="coerce")
@@ -281,7 +282,6 @@ with tab4:
                     lambda c: modelo_optico.evaluar_clasificacion_fisiologica(c) if pd.notna(c) else "Indeterminado"
                 )
                 
-                # Paso 4: Consolidación final
                 estado_texto.text("Paso 4/4: Consolidando resultados...")
                 barra_progreso.progress(100)
                 time.sleep(0.05)
@@ -289,12 +289,10 @@ with tab4:
                 barra_progreso.empty()
                 estado_texto.success(f"Procesamiento completado: {len(df_lote):,} muestras analizadas bajo λ = {lambda_nm} nm y L = {L_mm} mm.")
                 
-                # Renderizar tabla
                 st.dataframe(df_lote.head(1000))
                 if len(df_lote) > 1000:
                     st.caption(f"Mostrando una vista previa de las primeras 1,000 filas de un total de {len(df_lote):,} registros.")
                 
-                # Exportación en Excel y CSV
                 col_btn1, col_btn2 = st.columns(2)
                 with col_btn1:
                     excel_bytes = generar_excel_multihoja(df_lote, lambda_nm, L_mm)
