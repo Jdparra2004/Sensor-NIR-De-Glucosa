@@ -45,44 +45,51 @@ def aplicar_ruido(valor):
     return valor * np.random.uniform(0.95, 1.05) if noise_instrumental else valor
 
 def generar_excel_multihoja(df_resultado, lambda_val, L_val):
-    """Genera un archivo Excel estructurado en memoria con múltiples hojas."""
+    """Genera un archivo Excel estructurado en memoria con múltiples hojas de forma segura."""
     output = io.BytesIO()
-    with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        df_resultado.to_excel(writer, sheet_name='Datos_Procesados', index=False)
-        
-        if "Clasificación_Metabólica" in df_resultado.columns:
-            conteo = df_resultado["Clasificación_Metabólica"].value_counts().reset_index()
-            conteo.columns = ["Categoría Fisiológica", "Total Muestras"]
-            conteo["Porcentaje (%)"] = (conteo["Total Muestras"] / len(df_resultado) * 100).round(2)
-            conteo.to_excel(writer, sheet_name='Resumen_Clasificacion', index=False)
-        
-        metricas = {
-            "Parámetro": [
-                "Longitud de onda aplicada (λ)",
-                "Camino óptico aplicado (L)",
-                "Total de muestras evaluadas",
-                "Concentración media estimada",
-                "Concentración mínima",
-                "Concentración máxima"
-            ],
-            "Valor": [
-                f"{lambda_val} nm",
-                f"{L_val} mm",
-                len(df_resultado),
-                f"{df_resultado['Glucosa_Estimada_mM'].mean():.4f} mM",
-                f"{df_resultado['Glucosa_Estimada_mM'].min():.4f} mM",
-                f"{df_resultado['Glucosa_Estimada_mM'].max():.4f} mM"
-            ]
-        }
-        if "Error_%" in df_resultado.columns:
-            metricas["Parámetro"].append("Error relativo promedio")
-            metricas["Valor"].append(f"{df_resultado['Error_%'].mean():.2f} %")
+    try:
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            # Hoja 1: Datos Detallados
+            df_resultado.to_excel(writer, sheet_name='Datos_Procesados', index=False)
             
-        df_params = pd.DataFrame(metricas)
-        df_params.to_excel(writer, sheet_name='Parametros_Simulacion', index=False)
-        
-    output.seek(0)
-    return output.getvalue()
+            # Hoja 2: Resumen de Clasificación
+            if "Clasificación_Metabólica" in df_resultado.columns:
+                conteo = df_resultado["Clasificación_Metabólica"].value_counts().reset_index()
+                conteo.columns = ["Categoría Fisiológica", "Total Muestras"]
+                conteo["Porcentaje (%)"] = (conteo["Total Muestras"] / len(df_resultado) * 100).round(2)
+                conteo.to_excel(writer, sheet_name='Resumen_Clasificacion', index=False)
+            
+            # Hoja 3: Parámetros del Ensayo Óptico
+            c_validos = df_resultado["Glucosa_Estimada_mM"].dropna()
+            metricas = {
+                "Parámetro": [
+                    "Longitud de onda aplicada (λ)",
+                    "Camino óptico aplicado (L)",
+                    "Total de muestras analizadas",
+                    "Concentración media estimada",
+                    "Concentración mínima",
+                    "Concentración máxima"
+                ],
+                "Valor": [
+                    f"{lambda_val} nm",
+                    f"{L_val} mm",
+                    len(df_resultado),
+                    f"{c_validos.mean():.4f} mM" if not c_validos.empty else "N/A",
+                    f"{c_validos.min():.4f} mM" if not c_validos.empty else "N/A",
+                    f"{c_validos.max():.4f} mM" if not c_validos.empty else "N/A"
+                ]
+            }
+            if "Error_%" in df_resultado.columns and not df_resultado["Error_%"].dropna().empty:
+                metricas["Parámetro"].append("Error relativo promedio")
+                metricas["Valor"].append(f"{df_resultado['Error_%'].dropna().mean():.2f} %")
+                
+            df_params = pd.DataFrame(metricas)
+            df_params.to_excel(writer, sheet_name='Parametros_Simulacion', index=False)
+            
+        output.seek(0)
+        return output.getvalue()
+    except Exception:
+        return None
 
 # --- PÁGINAS ---
 st.title("Biosensor NIR: Simulación Integrada")
@@ -226,6 +233,8 @@ with tab4:
         * **Columna de absorbancia (Obligatoria):** Encabezados válidos: `absorbancia_medida`, `absorbancia_1600nm`, `absorbancia_1650nm`, `absorbancia` o `A`. Valores en **u.a.** (unidades de absorbancia neta).
         * **Columna de referencia (Opcional):** Encabezados válidos: `glucosa_referencia_mM`, `Glucosa_Real_mM`, `glucosa_mM` o `C_real`. Valores en **mM** (milimolar) para el cálculo de error porcentual.
         * **Identificador (Opcional):** `id_muestra` (alfanumérico).
+
+        ⚠️ **Recomendación de Rendimiento:** Se aconseja cargar archivos con un máximo de **1,000 filas** para asegurar una respuesta fluida. Si se sube un lote mayor, el sistema procesará y graficará automáticamente las primeras 1,000 muestras.
         """)
 
     uploaded = st.file_uploader("Subir archivo CSV de muestras", type=["csv", "txt"])
@@ -246,6 +255,12 @@ with tab4:
                 uploaded.seek(0)
                 df_lote = pd.read_csv(uploaded, sep=None, engine="python")
             
+            # Validación y limitación a 1,000 filas para rendimiento óptimo
+            total_filas_original = len(df_lote)
+            if total_filas_original > 1000:
+                df_lote = df_lote.head(1000).copy()
+                st.warning(f"El archivo contiene {total_filas_original:,} filas. Para garantizar la fluidez de la interfaz, se procesan y analizan las primeras 1,000 muestras.")
+
             estado_texto.text("Paso 2/4: Identificando canal óptico de absorbancia...")
             barra_progreso.progress(50)
             time.sleep(0.05)
@@ -264,7 +279,7 @@ with tab4:
                         break
 
             if col_abs is not None:
-                estado_texto.text(rf"Paso 3/4: Ejecutando inferencia inversa ($\\lambda={lambda_nm}\\text{{ nm}}$, $L={L_mm}\\text{{ mm}}$)...")
+                estado_texto.text(rf"Paso 3/4: Ejecutando inferencia inversa ($\lambda={lambda_nm}\text{{ nm}}$, $L={L_mm}\text{{ mm}}$)...")
                 barra_progreso.progress(75)
                 
                 valores_abs = pd.to_numeric(df_lote[col_abs], errors="coerce")
@@ -282,26 +297,89 @@ with tab4:
                     lambda c: modelo_optico.evaluar_clasificacion_fisiologica(c) if pd.notna(c) else "Indeterminado"
                 )
                 
-                estado_texto.text("Paso 4/4: Consolidando resultados...")
+                estado_texto.text("Paso 4/4: Consolidando resultados y visualizaciones...")
                 barra_progreso.progress(100)
                 time.sleep(0.05)
                 
                 barra_progreso.empty()
                 estado_texto.success(f"Procesamiento completado: {len(df_lote):,} muestras analizadas bajo λ = {lambda_nm} nm y L = {L_mm} mm.")
                 
-                st.dataframe(df_lote.head(1000))
-                if len(df_lote) > 1000:
-                    st.caption(f"Mostrando una vista previa de las primeras 1,000 filas de un total de {len(df_lote):,} registros.")
+                # Tabla de resultados
+                st.dataframe(df_lote)
                 
+                # --- GRÁFICOS DE ANÁLISIS DEL LOTE ---
+                st.markdown("#### Análisis Estadístico y Fisiológico del Lote")
+                col_g1, col_g2 = st.columns(2)
+                
+                # Gráfico 1: Conteo por Categoría Fisiológica
+                conteo_df = df_lote["Clasificación_Metabólica"].value_counts().reset_index()
+                conteo_df.columns = ["Categoría", "Muestras"]
+                
+                colores_map = {
+                    "Normal": "#2ca02c",
+                    "Rango de Alerta / Sospecha de Prediabetes": "#ff7f0e",
+                    "Nivel Elevado / Sospecha Hiperglucemia": "#d62728",
+                    "Fuera de rango analítico / Indetectable": "#7f7f7f"
+                }
+                bar_colors = [colores_map.get(cat, "#1f77b4") for cat in conteo_df["Categoría"]]
+                
+                fig_lote_cat = go.Figure()
+                fig_lote_cat.add_trace(go.Bar(
+                    x=conteo_df["Categoría"],
+                    y=conteo_df["Muestras"],
+                    marker_color=bar_colors,
+                    name="Muestras por Estado"
+                ))
+                fig_lote_cat.update_layout(
+                    title="<b>Distribución de Categorías Fisiológicas</b>",
+                    xaxis_title="Estado Metabólico",
+                    yaxis_title="Cantidad de Muestras",
+                    height=350,
+                    showlegend=False,
+                    margin=dict(l=40, r=40, t=50, b=40)
+                )
+                col_g1.plotly_chart(fig_lote_cat)
+                
+                # Gráfico 2: Dispersión de Concentración Estimada con Umbrales
+                fig_lote_disp = go.Figure()
+                indices_muestras = list(range(1, len(df_lote) + 1))
+                
+                fig_lote_disp.add_trace(go.Scatter(
+                    x=indices_muestras,
+                    y=df_lote["Glucosa_Estimada_mM"],
+                    mode="markers",
+                    name="Glucosa Estimada (mM)",
+                    marker=dict(color="#1f77b4", size=5, opacity=0.7)
+                ))
+                fig_lote_disp.add_hline(y=0.20, line_dash="dash", line_color="green", annotation_text="Límite Normal (0.20 mM)")
+                fig_lote_disp.add_hline(y=0.40, line_dash="dash", line_color="red", annotation_text="Umbral Hiperglucemia (0.40 mM)")
+                
+                fig_lote_disp.update_layout(
+                    title="<b>Concentración Estimada por Muestra</b>",
+                    xaxis_title="Índice de Muestra",
+                    yaxis_title="Glucosa [mM]",
+                    height=350,
+                    showlegend=True,
+                    legend=LEYENDA_INFERIOR,
+                    margin=dict(l=40, r=40, t=50, b=40)
+                )
+                col_g2.plotly_chart(fig_lote_disp)
+                
+                # Exportación
                 col_btn1, col_btn2 = st.columns(2)
+                excel_bytes = generar_excel_multihoja(df_lote, lambda_nm, L_mm)
+                
                 with col_btn1:
-                    excel_bytes = generar_excel_multihoja(df_lote, lambda_nm, L_mm)
-                    st.download_button(
-                        label="Descargar Reporte Completo en Excel (.xlsx)",
-                        data=excel_bytes,
-                        file_name="Reporte_Biosensor_NIR.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                    )
+                    if excel_bytes is not None:
+                        st.download_button(
+                            label="Descargar Reporte Completo en Excel (.xlsx)",
+                            data=excel_bytes,
+                            file_name="Reporte_Biosensor_NIR.xlsx",
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                        )
+                    else:
+                        st.info("Exportación directa a CSV disponible.")
+                        
                 with col_btn2:
                     st.download_button(
                         label="Descargar en formato CSV",
