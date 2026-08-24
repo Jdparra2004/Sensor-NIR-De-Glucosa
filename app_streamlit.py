@@ -147,18 +147,42 @@ with tab5:
 
 # Tab 6: Procesamiento de Dataset
 with tab6:
-    st.subheader("Procesamiento de Muestras en Lote")
-    uploaded_file = st.file_uploader("Subir CSV", type="csv")
+    st.subheader("Procesamiento de Muestras en Lote / Validación In Silico")
+    uploaded_file = st.file_uploader("Subir CSV de muestras (formato: id_muestra, lambda_nm, absorbancia_medida, glucosa_referencia_mM, interferente_mM)", type="csv")
     
     if uploaded_file:
         df_input = pd.read_csv(uploaded_file)
-    else:
-        df_input = st.data_editor(pd.DataFrame({"Absorbancia": [0.02, 0.05, 0.08, 0.15]}))
         
-    if st.button("Procesar"):
-        df_res = df_input.copy()
-        df_res["Glucosa [mM]"] = df_res["Absorbancia"].apply(lambda a: modelo_optico.concentracion_inversa(a, lambda_nm))
-        df_res["Clasificación"] = df_res["Glucosa [mM]"].apply(modelo_optico.evaluar_clasificacion_fisiologica)
-        
-        st.dataframe(df_res)
-        st.download_button("Descargar", df_res.to_csv(index=False), "reporte.csv")
+        if st.button("Procesar Lote"):
+            # Procesamiento fila a fila
+            resultados = []
+            
+            # Agrupar por muestra si hay múltiples lambda por muestra
+            for muestra_id, grupo in df_input.groupby('id_muestra'):
+                # Usar la primera lambda disponible para el cálculo (o la lambda configurada)
+                # Opcional: promediar o considerar múltiples lambda si el modelo lo soportara
+                row = grupo.iloc[0]
+                A = row['absorbancia_medida']
+                c_ref = row['glucosa_referencia_mM']
+                
+                # Inversa del modelo físico
+                c_est = modelo_optico.concentracion_inversa(A, lambda_nm)
+                
+                resultados.append({
+                    "id_muestra": muestra_id,
+                    "Glucosa Referencia [mM]": c_ref,
+                    "Glucosa Estimada [mM]": c_est,
+                    "Error Relativo": abs(c_ref - c_est) / c_ref if c_ref != 0 else 0,
+                    "Clasificación": modelo_optico.evaluar_clasificacion_fisiologica(c_est)
+                })
+            
+            df_res = pd.DataFrame(resultados)
+            
+            # Métricas
+            rmse = np.sqrt(((df_res["Glucosa Referencia [mM]"] - df_res["Glucosa Estimada [mM]"])**2).mean())
+            st.metric("RMSE [mM]", f"{rmse:.4f}")
+            
+            st.dataframe(df_res)
+            
+            csv = df_res.to_csv(index=False).encode('utf-8')
+            st.download_button("Descargar Reporte Validación", csv, "reporte_validacion.csv", "text/csv")

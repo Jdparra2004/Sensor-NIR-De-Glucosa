@@ -137,28 +137,46 @@ class TestSensorNIR(unittest.TestCase):
     def test_diagnostico_clinico_tres_casos(self):
         """
         Prueba los 3 escenarios clínicos posibles:
-        - No diabetes (Normal)
-        - Tal vez diabetes (Riesgo / Prediabetes)
-        - Sí diabetes (Muy Alto / Hiperglucemia)
+        - Normal
+        - Rango de Alerta / Sospecha de Prediabetes
+        - Nivel Elevado / Sospecha Hiperglucemia
         """
-        # Caso 1: NO Diabetes -> Nivel Normal (<= 0.2 mM)
-        diag_normal = self.modelo_optico.evaluar_riesgo_clinico(0.1)
-        self.assertIn("Nivel Normal", diag_normal, "Falló la clasificación de caso Normal")
+        # Caso 1: Normal (<= 0.2 mM)
+        diag_normal = self.modelo_optico.evaluar_clasificacion_fisiologica(0.1)
+        self.assertIn("Normal", diag_normal, "Falló la clasificación de caso Normal")
         
-        # Caso 2: TAL VEZ Diabetes -> Nivel Elevado (0.2 a 0.4 mM)
-        diag_riesgo = self.modelo_optico.evaluar_riesgo_clinico(0.3)
-        self.assertIn("Nivel Elevado", diag_riesgo, "Falló la clasificación de caso de Riesgo")
+        # Caso 2: Rango de Alerta (0.2 a 0.4 mM)
+        diag_riesgo = self.modelo_optico.evaluar_clasificacion_fisiologica(0.3)
+        self.assertIn("Rango de Alerta", diag_riesgo, "Falló la clasificación de caso de Riesgo")
         
-        # Caso 3: SÍ Diabetes -> Nivel Muy Alto (> 0.4 mM)
-        diag_alto = self.modelo_optico.evaluar_riesgo_clinico(0.8)
-        self.assertIn("Nivel Muy Alto", diag_alto, "Falló la clasificación de caso de Diabetes")
+        # Caso 3: Nivel Elevado (> 0.4 mM)
+        diag_alto = self.modelo_optico.evaluar_clasificacion_fisiologica(0.8)
+        self.assertIn("Nivel Elevado", diag_alto, "Falló la clasificación de caso de Elevado")
 
     def test_diagnostico_valores_extremos(self):
         """
         Prueba cómo reacciona el sistema ante valores absurdos o bajo el límite de detección.
         """
-        diag_indetectable = self.modelo_optico.evaluar_riesgo_clinico(-0.05)
+        diag_indetectable = self.modelo_optico.evaluar_clasificacion_fisiologica(-0.05)
         self.assertIn("Indetectable", diag_indetectable, "El sistema no manejó correctamente valores por debajo de 0.01")
+        
+    def test_procesamiento_lote_csv(self):
+        """Prueba que el procesamiento de los nuevos archivos CSV de referencia funcione."""
+        file_path = Path("data/processed/muestras_referencia_nir.csv")
+        self.assertTrue(file_path.exists(), "El archivo de referencia no existe, ejecuta utils/preparar_datos_referencia.py")
+        
+        df = pd.read_csv(file_path)
+        self.assertFalse(df.empty)
+        self.assertIn("absorbancia_medida", df.columns)
+        self.assertIn("glucosa_referencia_mM", df.columns)
+        
+        # Procesar unas cuantas filas
+        sample = df.head(5)
+        sample["c_est"] = sample["absorbancia_medida"].apply(lambda a: self.modelo_optico.concentracion_inversa(a, LAMBDA_REFERENCIA_NM))
+        
+        self.assertEqual(len(sample), 5)
+        self.assertIn("c_est", sample.columns)
+
 
 if __name__ == '__main__':
     unittest.main()

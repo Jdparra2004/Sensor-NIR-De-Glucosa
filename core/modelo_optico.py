@@ -230,13 +230,10 @@ class ModeloBeerLambertNIR:
         else:
             denominador = L * eps_g
             
-        # Utilizamos la magnitud absoluta para asegurar que la relación A/C sea positiva
-        denominador_neto = abs(denominador)
-            
-        if denominador_neto == 0:
+        if denominador == 0:
             return 0.0
             
-        C_calculada = absorbancia / denominador_neto
+        C_calculada = absorbancia / denominador
         return max(0.0, C_calculada)
 
     def evaluar_clasificacion_fisiologica(self, concentracion_mM: float) -> str:
