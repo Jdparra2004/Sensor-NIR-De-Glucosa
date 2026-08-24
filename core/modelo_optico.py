@@ -233,8 +233,7 @@ class ModeloBeerLambertNIR:
         if denominador == 0:
             return 0.0
             
-        C_calculada = absorbancia / denominador
-        return max(0.0, C_calculada)
+        return absorbancia / denominador
 
     def evaluar_clasificacion_fisiologica(self, concentracion_mM: float) -> str:
         """
