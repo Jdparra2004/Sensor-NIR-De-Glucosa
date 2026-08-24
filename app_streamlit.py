@@ -1,3 +1,7 @@
+"""
+app_streamlit.py — Interfaz interactiva del Biosensor NIR
+"""
+
 import streamlit as st
 import numpy as np
 import pandas as pd
@@ -42,7 +46,7 @@ with tab1:
     fig1.update_layout(title="Absorbancia neta vs Concentración", xaxis_title="C [mM]", yaxis_title="A")
     col1.plotly_chart(fig1)
 
-    lambdas, spect = modelo_optico.espectro_completo(c_sim)
+    lambdas, spect = modelo_optico.espectro_completo(c_sim, lambdas=np.linspace(1000, 1700, 100))
     fig2 = go.Figure().add_trace(go.Scatter(x=lambdas, y=spect, name='Espectro'))
     fig2.add_vrect(x0=1600, x1=1700, fillcolor="lightgray", opacity=0.3)
     fig2.update_layout(title="Espectro NIR", xaxis_title="λ [nm]", yaxis_title="A")
@@ -50,7 +54,11 @@ with tab1:
 
     st.latex(r"A_{\text{neta}}(\lambda) = (\epsilon_g(\lambda) - \epsilon_w(\lambda) \cdot \delta_w) \cdot C \cdot L")
     A_actual = modelo_optico.absorbancia(c_sim, lambda_nm)
-    st.info(f"A λ = {lambda_nm} nm, L = {L_mm} mm y C = {c_sim} mM, la absorbancia neta es de **{A_actual:.5f} u.a.** La pendiente negativa responde al desplazamiento volumétrico del agua ($\delta_w \approx 6.15$): al disolverse glucosa, se excluye solvente, disminuyendo la absorción del agua.")
+    st.info(
+        rf"A λ = {lambda_nm} nm, L = {L_mm} mm y C = {c_sim} mM, la absorbancia neta es de **{A_actual:.5f} u.a.** "
+        rf"La pendiente negativa responde al desplazamiento volumétrico del agua ($\delta_w \approx 6.15$): "
+        rf"al disolverse glucosa, se excluye solvente, disminuyendo la absorción del agua."
+    )
 
 # Tab 2: Microfluídica
 with tab2:
@@ -70,7 +78,12 @@ with tab2:
     
     st.latex(r"Re = \frac{2\rho Q}{\mu(w+h)} \quad \text{y} \quad t_r = \frac{V_{\text{celda}}}{Q}")
     re_actual = modelo_micro.numero_reynolds()
-    st.info(f"Con Q={Q_nlmin} nL/min, Re = **{re_actual:.6f}** ({'Régimen Laminar' if re_actual < 1 else 'Flujo No Laminar'}). Velocidad media: **{modelo_micro.velocidad_media_m_s()*1e6:.2f} µm/s**. Tiempo de residencia: **{modelo_micro.tiempo_residencia_s():.2f} s**.")
+    st.info(
+        f"Con Q={Q_nlmin} nL/min, Re = **{re_actual:.6f}** "
+        f"({'Régimen Laminar' if re_actual < 1 else 'Flujo No Laminar'}). "
+        f"Velocidad media: **{modelo_micro.velocidad_media_m_s()*1e6:.2f} µm/s**. "
+        f"Tiempo de residencia: **{modelo_micro.tiempo_residencia_s():.2f} s**."
+    )
 
 # Tab 3: Sensibilidad
 with tab3:
@@ -101,9 +114,15 @@ with tab4:
     st.markdown("---")
     uploaded = st.file_uploader("Subir CSV de lotes", type="csv")
     if uploaded:
-        df_lote = pd.read_csv(uploaded)
-        if 'absorbancia_1600nm' in df_lote.columns:
-            df_lote["Glucosa_Estimada_mM"] = df_lote['absorbancia_1600nm'].apply(lambda a: modelo_optico.concentracion_inversa(a, 1600))
+        df_lote = pd.read_csv(uploaded, low_memory=False)
+        col_abs = None
+        for candidate in ['absorbancia_1600nm', 'absorbancia_medida', 'absorbancia']:
+            if candidate in df_lote.columns:
+                col_abs = candidate
+                break
+        
+        if col_abs:
+            df_lote["Glucosa_Estimada_mM"] = df_lote[col_abs].apply(lambda a: modelo_optico.concentracion_inversa(a, lambda_nm))
             if 'glucosa_referencia_mM' in df_lote.columns:
                 df_lote["Error_%"] = ((df_lote["Glucosa_Estimada_mM"] - df_lote['glucosa_referencia_mM']) / df_lote['glucosa_referencia_mM']) * 100
             df_lote["Clasificación_Metabólica"] = df_lote["Glucosa_Estimada_mM"].apply(modelo_optico.evaluar_clasificacion_fisiologica)

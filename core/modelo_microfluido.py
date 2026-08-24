@@ -74,10 +74,7 @@ class ModeloMicrofluido:
         return self.caudal_m3_s / self.area_transversal_m2
 
     def numero_reynolds(self) -> float:
-        """
-        Calcula el número adimensional de Reynolds:
-        Re = (rho * v * Dh) / mu
-        """
+        """Calcula el número de Reynolds: Re = (rho * v * Dh) / mu."""
         v = self.velocidad_media_m_s()
         dh = self.diametro_hidraulico_m
         if VISCOSIDAD_SUDOR_Pa_s <= 0:
@@ -89,16 +86,21 @@ class ModeloMicrofluido:
         return bool(self.numero_reynolds() < REYNOLDS_LIMITE_LAMINAR)
 
     def tiempo_residencia_s(self) -> float:
-        """
-        Calcula el tiempo de residencia tr = L / v = V / Q [s]
-        dentro de la zona de interrogación óptica.
-        """
+        """Calcula el tiempo de residencia tr = L / v = V / Q [s]."""
         v = self.velocidad_media_m_s()
         if v <= 0:
             return float("inf")
         return self.largo_m / v
-    
+
+    def concentracion_efectiva_zona_optica(self, c_entrada_mM: float) -> float:
+        """
+        Calcula la concentración efectiva en la zona óptica.
+        En flujo laminar estacionario sin pérdidas reactivas, C_ef = C_in.
+        """
+        return float(c_entrada_mM)
+
     def resumen_parametros(self) -> dict:
+        """Retorna un diccionario con los parámetros del flujo."""
         return {
             "ancho_um": self.ancho_um,
             "alto_um": self.alto_um,

@@ -44,7 +44,6 @@ ABSORPTIVIDAD_AGUA = {
     1700: 0.1200,
 }
 
-# Aliases de compatibilidad
 COEF_DESPLAZAMIENTO_AGUA: float = DELTA_W
 CONCENTRACION_AGUA: float = 55_500.0
 
@@ -58,6 +57,11 @@ class ModeloBeerLambertNIR:
     def __init__(self, longitud_optica_mm: float = 1.0, incluir_desplazamiento_agua: bool = True):
         self.longitud_optica_mm = float(longitud_optica_mm)
         self.incluir_desplazamiento_agua = bool(incluir_desplazamiento_agua)
+
+    @property
+    def longitudes_onda(self) -> np.ndarray:
+        """Retorna el arreglo de longitudes de onda base indexadas."""
+        return np.array(sorted(ABSORPTIVIDAD_GLUCOSA.keys()), dtype=float)
 
     def _interpolar(self, tabla: dict, lam: Union[float, np.ndarray]) -> Union[float, np.ndarray]:
         """Interpola linealmente los coeficientes espectrales."""
@@ -95,9 +99,7 @@ class ModeloBeerLambertNIR:
         return float(abs(absorbancia) / (abs(eps_net) * L))
 
     def evaluar_clasificacion_fisiologica(self, concentracion_mM: float) -> str:
-        """
-        Clasifica la concentración de glucosa en sudor en rangos metabólicos clínicos.
-        """
+        """Clasifica la concentración de glucosa en sudor en rangos metabólicos clínicos."""
         if concentracion_mM < 0.01 or concentracion_mM > 2.0:
             return "Fuera de rango analítico / Indetectable"
         elif concentracion_mM <= 0.20:
@@ -107,17 +109,17 @@ class ModeloBeerLambertNIR:
         else:
             return "Nivel Elevado / Sospecha Hiperglucemia"
 
-    def espectro_completo(self, concentracion_mM: float, puntos: int = 100) -> Tuple[np.ndarray, np.ndarray]:
-        """Genera un barrido espectral continuo entre 1000 y 1700 nm."""
-        lambdas = np.linspace(RANGO_LAMBDA_NM[0], RANGO_LAMBDA_NM[1], puntos)
+    def espectro_completo(self, concentracion_mM: float, lambdas: np.ndarray = None) -> Tuple[np.ndarray, np.ndarray]:
+        """Genera un barrido espectral continuo o sobre un vector de longitudes de onda dado."""
+        if lambdas is None:
+            lambdas = self.longitudes_onda
         A = self.absorbancia(concentracion_mM, lambdas)
-        return lambdas, A
+        return lambdas, np.array(A, dtype=float)
 
     def sensibilidad(self, lambda_nm: float) -> float:
-        """
-        Calcula la sensibilidad local analítica dA/dC = eps_net * L.
-        """
+        """Calcula la sensibilidad local analítica dA/dC = eps_net * L."""
         return float(self.obtener_coeficiente_neto(lambda_nm) * self.longitud_optica_mm)
     
     def barrido_concentraciones(self, concentraciones: np.ndarray, lambda_nm: float) -> np.ndarray:
+        """Evalúa un vector de concentraciones manteniendo fija la longitud de onda."""
         return np.array([self.absorbancia(c, lambda_nm) for c in concentraciones], dtype=float)
