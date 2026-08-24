@@ -14,7 +14,7 @@ from core.modelo_microfluido import ModeloMicrofluido
 
 st.set_page_config(page_title="Biosensor NIR - Glucosa en Sudor", layout="wide")
 
-# Configuración estándar para colocar la leyenda abajo en todas las figuras
+# Configuración estándar para colocar la leyenda abajo y centrada
 LEYENDA_INFERIOR = dict(
     orientation="h",
     yanchor="top",
@@ -45,18 +45,19 @@ def aplicar_ruido(valor):
     return valor * np.random.uniform(0.95, 1.05) if noise_instrumental else valor
 
 def generar_excel_multihoja(df_resultado, lambda_val, L_val):
-    """Genera un archivo Excel estructurado en memoria con múltiples hojas de análisis."""
+    """Genera un archivo Excel estructurado en memoria con múltiples hojas garantizando visibilidad."""
     output = io.BytesIO()
+    
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        # Hoja 1: Datos Detallados Muestra por Muestra
+        # Hoja 1: Datos Detallados
         df_resultado.to_excel(writer, sheet_name='Datos_Procesados', index=False)
         
         # Hoja 2: Distribución y Frecuencia Clínica
         if "Clasificación_Metabólica" in df_resultado.columns:
-            resumen_clinico = df_resultado["Clasificación_Metabólica"].value_counts().reset_index()
-            resumen_clinico.columns = ["Categoría Fisiológica", "Total Muestras"]
-            resumen_clinico["Porcentaje (%)"] = (resumen_clinico["Total Muestras"] / len(df_resultado) * 100).round(2)
-            resumen_clinico.to_excel(writer, sheet_name='Resumen_Clasificacion', index=False)
+            conteo = df_resultado["Clasificación_Metabólica"].value_counts().reset_index()
+            conteo.columns = ["Categoría Fisiológica", "Total Muestras"]
+            conteo["Porcentaje (%)"] = (conteo["Total Muestras"] / len(df_resultado) * 100).round(2)
+            conteo.to_excel(writer, sheet_name='Resumen_Clasificacion', index=False)
         
         # Hoja 3: Parámetros del Ensayo Óptico
         metricas = {
@@ -84,6 +85,13 @@ def generar_excel_multihoja(df_resultado, lambda_val, L_val):
         df_params = pd.DataFrame(metricas)
         df_params.to_excel(writer, sheet_name='Parametros_Simulacion', index=False)
         
+        # Corrección de estado de hojas en openpyxl
+        if hasattr(writer, 'book') and writer.book is not None:
+            for ws in writer.book.worksheets:
+                ws.sheet_state = 'visible'
+            if len(writer.book.worksheets) > 0:
+                writer.book.active = 0
+                
     return output.getvalue()
 
 # --- PÁGINAS ---
@@ -231,7 +239,7 @@ with tab4:
             # Paso 2: Detección de columnas
             estado_texto.text("Paso 2/4: Identificando canal óptico de absorbancia...")
             barra_progreso.progress(50)
-            time.sleep(0.1)
+            time.sleep(0.05)
             
             col_abs = None
             candidatos_abs = ['absorbancia_1600nm', 'absorbancia_1650nm', 'absorbancia_medida', 'absorbancia', 'Absorbance', 'A']
@@ -267,29 +275,33 @@ with tab4:
                 )
                 
                 # Paso 4: Consolidación final
-                estado_texto.text("Paso 4/4: Generando reporte estructurado...")
+                estado_texto.text("Paso 4/4: Consolidando resultados...")
                 barra_progreso.progress(100)
-                time.sleep(0.2)
+                time.sleep(0.05)
                 
-                # Limpiar barra tras completar
                 barra_progreso.empty()
                 estado_texto.success(f"Procesamiento completado: {len(df_lote):,} muestras analizadas correctamente.")
                 
+                # Renderizar tabla
                 st.dataframe(df_lote.head(1000))
                 if len(df_lote) > 1000:
                     st.caption(f"Mostrando una vista previa de las primeras 1,000 filas de un total de {len(df_lote):,} registros.")
                 
-                # Generación del archivo Excel en memoria
-                excel_bytes = generar_excel_multihoja(df_lote, lambda_nm, L_mm)
-                
+                # Generación controlada de Excel
                 col_btn1, col_btn2 = st.columns(2)
-                with col_btn1:
-                    st.download_button(
-                        label="Descargar Reporte Completo en Excel (.xlsx)",
-                        data=excel_bytes,
-                        file_name="Reporte_Biosensor_NIR.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                    )
+                try:
+                    excel_bytes = generar_excel_multihoja(df_lote, lambda_nm, L_mm)
+                    with col_btn1:
+                        st.download_button(
+                            label="Descargar Reporte Completo en Excel (.xlsx)",
+                            data=excel_bytes,
+                            file_name="Reporte_Biosensor_NIR.xlsx",
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                        )
+                except Exception as exc_excel:
+                    with col_btn1:
+                        st.warning(f"No fue posible compilar en .xlsx ({exc_excel}). Descargue el archivo en formato CSV.")
+                
                 with col_btn2:
                     st.download_button(
                         label="Descargar en formato CSV",
