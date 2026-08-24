@@ -9,6 +9,10 @@ import streamlit as st
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
+import openpyxl
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.utils import get_column_letter
+
 from core.modelo_optico import ModeloBeerLambertNIR
 from core.modelo_microfluido import ModeloMicrofluido
 
@@ -44,52 +48,105 @@ modelo_micro = ModeloMicrofluido(w_um, h_um, largo_mm, Q_nlmin)
 def aplicar_ruido(valor):
     return valor * np.random.uniform(0.95, 1.05) if noise_instrumental else valor
 
-def generar_excel_multihoja(df_resultado, lambda_val, L_val):
-    """Genera un archivo Excel estructurado en memoria con múltiples hojas de forma segura."""
+def generar_excel_multihoja_estetico(df_resultado, lambda_val, L_val):
+    """Genera un libro Excel multi-hoja con formato profesional, colores y estilos."""
     output = io.BytesIO()
-    try:
-        with pd.ExcelWriter(output, engine='openpyxl') as writer:
-            # Hoja 1: Datos Detallados
-            df_resultado.to_excel(writer, sheet_name='Datos_Procesados', index=False)
+    
+    # 1. Escritura estructurada con Pandas
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        # Hoja 1: Resultados Detallados
+        df_resultado.to_excel(writer, sheet_name='Resultados_Analisis', index=False)
+        
+        # Hoja 2: Resumen Fisiológico y Distribución
+        if "Clasificación_Metabólica" in df_resultado.columns:
+            conteo = df_resultado["Clasificación_Metabólica"].value_counts().reset_index()
+            conteo.columns = ["Categoría Fisiológica", "Total Muestras"]
+            conteo["Porcentaje (%)"] = (conteo["Total Muestras"] / len(df_resultado) * 100).round(2)
+            conteo.to_excel(writer, sheet_name='Distribucion_Metabolica', index=False)
+        
+        # Hoja 3: Parámetros Ópticos y Métricas
+        c_validos = df_resultado["Glucosa_Estimada_mM"].dropna()
+        metricas = {
+            "Parámetro de Simulación": [
+                "Longitud de onda de análisis (λ)",
+                "Camino óptico configurado (L)",
+                "Total de muestras evaluadas",
+                "Concentración media estimada",
+                "Concentración mínima detectada",
+                "Concentración máxima detectada"
+            ],
+            "Valor": [
+                f"{lambda_val} nm",
+                f"{L_val} mm",
+                len(df_resultado),
+                f"{c_validos.mean():.4f} mM" if not c_validos.empty else "N/A",
+                f"{c_validos.min():.4f} mM" if not c_validos.empty else "N/A",
+                f"{c_validos.max():.4f} mM" if not c_validos.empty else "N/A"
+            ]
+        }
+        if "Error_%" in df_resultado.columns and not df_resultado["Error_%"].dropna().empty:
+            metricas["Parámetro de Simulación"].append("Error relativo medio poblacional")
+            metricas["Valor"].append(f"{df_resultado['Error_%'].dropna().mean():.2f} %")
             
-            # Hoja 2: Resumen de Clasificación
-            if "Clasificación_Metabólica" in df_resultado.columns:
-                conteo = df_resultado["Clasificación_Metabólica"].value_counts().reset_index()
-                conteo.columns = ["Categoría Fisiológica", "Total Muestras"]
-                conteo["Porcentaje (%)"] = (conteo["Total Muestras"] / len(df_resultado) * 100).round(2)
-                conteo.to_excel(writer, sheet_name='Resumen_Clasificacion', index=False)
-            
-            # Hoja 3: Parámetros del Ensayo Óptico
-            c_validos = df_resultado["Glucosa_Estimada_mM"].dropna()
-            metricas = {
-                "Parámetro": [
-                    "Longitud de onda aplicada (λ)",
-                    "Camino óptico aplicado (L)",
-                    "Total de muestras analizadas",
-                    "Concentración media estimada",
-                    "Concentración mínima",
-                    "Concentración máxima"
-                ],
-                "Valor": [
-                    f"{lambda_val} nm",
-                    f"{L_val} mm",
-                    len(df_resultado),
-                    f"{c_validos.mean():.4f} mM" if not c_validos.empty else "N/A",
-                    f"{c_validos.min():.4f} mM" if not c_validos.empty else "N/A",
-                    f"{c_validos.max():.4f} mM" if not c_validos.empty else "N/A"
-                ]
-            }
-            if "Error_%" in df_resultado.columns and not df_resultado["Error_%"].dropna().empty:
-                metricas["Parámetro"].append("Error relativo promedio")
-                metricas["Valor"].append(f"{df_resultado['Error_%'].dropna().mean():.2f} %")
+        df_params = pd.DataFrame(metricas)
+        df_params.to_excel(writer, sheet_name='Parametros_Diseno', index=False)
+
+    # 2. Post-procesamiento estético con OpenPyXL
+    output.seek(0)
+    wb = openpyxl.load_workbook(output)
+    
+    # Estilos tipográficos y cromáticos
+    header_fill = PatternFill(start_color="1F4E79", end_color="1F4E79", fill_type="solid")
+    header_font = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
+    cell_font = Font(name="Calibri", size=10)
+    center_align = Alignment(horizontal="center", vertical="center")
+    thin_border = Border(
+        left=Side(style='thin', color='D9D9D9'),
+        right=Side(style='thin', color='D9D9D9'),
+        top=Side(style='thin', color='D9D9D9'),
+        bottom=Side(style='thin', color='D9D9D9')
+    )
+    
+    fill_normal = PatternFill(start_color="E2EFDA", end_color="E2EFDA", fill_type="solid")
+    fill_alerta = PatternFill(start_color="FFF2CC", end_color="FFF2CC", fill_type="solid")
+    fill_hiper = PatternFill(start_color="FCE4D6", end_color="FCE4D6", fill_type="solid")
+    
+    for ws in wb.worksheets:
+        ws.sheet_state = 'visible'
+        ws.views.sheetView[0].showGridLines = True
+        
+        # Formatear encabezado
+        for cell in ws[1]:
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = center_align
+        
+        # Formatear cuerpo y colorear categorías clínicas
+        for row in ws.iter_rows(min_row=2, max_row=ws.max_row, min_col=1, max_col=ws.max_column):
+            for cell in row:
+                cell.font = cell_font
+                cell.border = thin_border
+                cell.alignment = center_align
                 
-            df_params = pd.DataFrame(metricas)
-            df_params.to_excel(writer, sheet_name='Parametros_Simulacion', index=False)
+                # Resaltado condicional por texto de diagnóstico
+                if str(cell.value) == "Normal":
+                    cell.fill = fill_normal
+                elif "Alerta" in str(cell.value):
+                    cell.fill = fill_alerta
+                elif "Elevado" in str(cell.value) or "Hiperglucemia" in str(cell.value):
+                    cell.fill = fill_hiper
+
+        # Autoajuste dinámico de ancho de columnas
+        for col in ws.columns:
+            max_len = max(len(str(cell.value or '')) for cell in col)
+            col_letter = get_column_letter(col[0].column)
+            ws.column_dimensions[col_letter].width = max(max_len + 4, 12)
             
-        output.seek(0)
-        return output.getvalue()
-    except Exception:
-        return None
+    wb.active = 0
+    final_output = io.BytesIO()
+    wb.save(final_output)
+    final_output.seek(0)
+    return final_output.getvalue()
 
 # --- PÁGINAS ---
 st.title("Biosensor NIR: Simulación Integrada")
@@ -255,7 +312,7 @@ with tab4:
                 uploaded.seek(0)
                 df_lote = pd.read_csv(uploaded, sep=None, engine="python")
             
-            # Validación y limitación a 1,000 filas para rendimiento óptimo
+            # Validación y limitación a 1,000 filas
             total_filas_original = len(df_lote)
             if total_filas_original > 1000:
                 df_lote = df_lote.head(1000).copy()
@@ -297,14 +354,13 @@ with tab4:
                     lambda c: modelo_optico.evaluar_clasificacion_fisiologica(c) if pd.notna(c) else "Indeterminado"
                 )
                 
-                estado_texto.text("Paso 4/4: Consolidando resultados y visualizaciones...")
+                estado_texto.text("Paso 4/4: Consolidando resultados y libro de reporte...")
                 barra_progreso.progress(100)
                 time.sleep(0.05)
                 
                 barra_progreso.empty()
                 estado_texto.success(f"Procesamiento completado: {len(df_lote):,} muestras analizadas bajo λ = {lambda_nm} nm y L = {L_mm} mm.")
                 
-                # Tabla de resultados
                 st.dataframe(df_lote)
                 
                 # --- GRÁFICOS DE ANÁLISIS DEL LOTE ---
@@ -367,7 +423,7 @@ with tab4:
                 
                 # Exportación
                 col_btn1, col_btn2 = st.columns(2)
-                excel_bytes = generar_excel_multihoja(df_lote, lambda_nm, L_mm)
+                excel_bytes = generar_excel_multihoja_estetico(df_lote, lambda_nm, L_mm)
                 
                 with col_btn1:
                     if excel_bytes is not None:
