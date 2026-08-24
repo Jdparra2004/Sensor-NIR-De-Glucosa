@@ -264,7 +264,7 @@ with tab4:
                         break
 
             if col_abs is not None:
-                estado_texto.text(rf"Paso 3/4: Ejecutando inferencia inversa ($\lambda={lambda_nm}\text{{ nm}}$, $L={L_mm}\text{{ mm}}$)...")
+                estado_texto.text(rf"Paso 3/4: Ejecutando inferencia inversa ($\\lambda={lambda_nm}\\text{{ nm}}$, $L={L_mm}\\text{{ mm}}$)...")
                 barra_progreso.progress(75)
                 
                 valores_abs = pd.to_numeric(df_lote[col_abs], errors="coerce")
