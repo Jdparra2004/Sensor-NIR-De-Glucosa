@@ -45,7 +45,7 @@ def aplicar_ruido(valor):
     return valor * np.random.uniform(0.95, 1.05) if noise_instrumental else valor
 
 def generar_excel_multihoja(df_resultado, lambda_val, L_val):
-    """Genera un archivo Excel estructurado en memoria con múltiples hojas garantizando visibilidad."""
+    """Genera un archivo Excel estructurado en memoria con múltiples hojas de análisis."""
     output = io.BytesIO()
     
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
@@ -62,8 +62,8 @@ def generar_excel_multihoja(df_resultado, lambda_val, L_val):
         # Hoja 3: Parámetros del Ensayo Óptico
         metricas = {
             "Parámetro": [
-                "Longitud de onda (λ)",
-                "Camino óptico (L)",
+                "Longitud de onda aplicada (λ)",
+                "Camino óptico aplicado (L)",
                 "Total de muestras evaluadas",
                 "Concentración media estimada",
                 "Concentración mínima",
@@ -85,13 +85,7 @@ def generar_excel_multihoja(df_resultado, lambda_val, L_val):
         df_params = pd.DataFrame(metricas)
         df_params.to_excel(writer, sheet_name='Parametros_Simulacion', index=False)
         
-        # Corrección de estado de hojas en openpyxl
-        if hasattr(writer, 'book') and writer.book is not None:
-            for ws in writer.book.worksheets:
-                ws.sheet_state = 'visible'
-            if len(writer.book.worksheets) > 0:
-                writer.book.active = 0
-                
+    output.seek(0)
     return output.getvalue()
 
 # --- PÁGINAS ---
@@ -128,7 +122,7 @@ with tab1:
     )
     col2.plotly_chart(fig2)
 
-    st.latex(r"A_{\text{neta}}(\lambda) = (\epsilon_g(\lambda) - \epsilon_w(\lambda) \cdot \delta_w) \cdot C \cdot L")
+    st.latex(r"A_{\\text{neta}}(\\lambda) = (\epsilon_g(\\lambda) - \epsilon_w(\\lambda) \cdot \delta_w) \cdot C \cdot L")
     A_actual = modelo_optico.absorbancia(c_sim, lambda_nm)
     st.info(
         rf"A λ = {lambda_nm} nm, L = {L_mm} mm y C = {c_sim} mM, la absorbancia neta es de **{A_actual:.5f} u.a.** "
@@ -166,7 +160,7 @@ with tab2:
     )
     col2.plotly_chart(fig4)
     
-    st.latex(r"Re = \frac{2\rho Q}{\mu(w+h)} \quad \text{y} \quad t_r = \frac{V_{\text{celda}}}{Q}")
+    st.latex(r"Re = \frac{2\rho Q}{\mu(w+h)} \quad \\text{y} \quad t_r = \frac{V_{\\text{celda}}}{Q}")
     re_actual = modelo_micro.numero_reynolds()
     st.info(
         f"Con Q={Q_nlmin} nL/min, Re = **{re_actual:.6f}** "
@@ -204,7 +198,7 @@ with tab3:
     )
     col2.plotly_chart(fig6)
     
-    st.latex(r"\text{Sensibilidad} = \frac{\partial A}{\partial C} = (\epsilon_g(\lambda) - \epsilon_w(\lambda) \cdot \delta_w) \cdot L")
+    st.latex(r"\\text{Sensibilidad} = \frac{\partial A}{\partial C} = (\epsilon_g(\\lambda) - \epsilon_w(\\lambda) \cdot \delta_w) \cdot L")
     st.info("La sensibilidad aumenta linealmente con el camino óptico L, permitiendo amplificar la señal neta sin afectar la selectividad del desplazamiento del solvente.")
 
 # Tab 4: Inferencia
@@ -217,6 +211,19 @@ with tab4:
         
     st.markdown("---")
     st.subheader("Procesamiento por Lotes")
+    
+    # Explicación de estructura del archivo y acoplamiento con el sidebar
+    with st.expander("ℹ️ Guía de formato para el archivo CSV y parámetros de análisis", expanded=False):
+        st.markdown(f"""
+        **Condiciones de Análisis Activas:**
+        * Los datos del archivo se evalúan en tiempo real con la **Longitud de onda ($\\lambda = {lambda_nm}\\text{{ nm}}$)** y el **Camino óptico ($L = {L_mm}\\text{{ mm}}$)** configurados en la barra lateral (*sidebar*).
+        
+        **Estructura y Unidades Requeridas en el CSV:**
+        * **Columna de absorbancia (Obligatoria):** Encabezados válidos: `absorbancia_medida`, `absorbancia_1600nm`, `absorbancia_1650nm`, `absorbancia` o `A`. Valores en **u.a.** (unidades de absorbancia neta).
+        * **Columna de referencia (Opcional):** Encabezados válidos: `glucosa_referencia_mM`, `Glucosa_Real_mM`, `glucosa_mM` o `C_real`. Valores en **mM** (milimolar) para el cálculo de error porcentual.
+        * **Identificador (Opcional):** `id_muestra` (alfanumérico).
+        """)
+
     uploaded = st.file_uploader("Subir archivo CSV de muestras", type=["csv", "txt"])
     
     if uploaded is not None:
@@ -256,7 +263,7 @@ with tab4:
 
             if col_abs is not None:
                 # Paso 3: Cálculo e inferencia
-                estado_texto.text(f"Paso 3/4: Ejecutando inferencia inversa sobre {len(df_lote):,} registros...")
+                estado_texto.text(f"Paso 3/4: Ejecutando inferencia inversa (λ={lambda_nm} nm, L={L_mm} mm)...")
                 barra_progreso.progress(75)
                 
                 valores_abs = pd.to_numeric(df_lote[col_abs], errors="coerce")
@@ -280,28 +287,23 @@ with tab4:
                 time.sleep(0.05)
                 
                 barra_progreso.empty()
-                estado_texto.success(f"Procesamiento completado: {len(df_lote):,} muestras analizadas correctamente.")
+                estado_texto.success(f"Procesamiento completado: {len(df_lote):,} muestras analizadas bajo λ = {lambda_nm} nm y L = {L_mm} mm.")
                 
                 # Renderizar tabla
                 st.dataframe(df_lote.head(1000))
                 if len(df_lote) > 1000:
                     st.caption(f"Mostrando una vista previa de las primeras 1,000 filas de un total de {len(df_lote):,} registros.")
                 
-                # Generación controlada de Excel
+                # Exportación en Excel y CSV
                 col_btn1, col_btn2 = st.columns(2)
-                try:
+                with col_btn1:
                     excel_bytes = generar_excel_multihoja(df_lote, lambda_nm, L_mm)
-                    with col_btn1:
-                        st.download_button(
-                            label="Descargar Reporte Completo en Excel (.xlsx)",
-                            data=excel_bytes,
-                            file_name="Reporte_Biosensor_NIR.xlsx",
-                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                        )
-                except Exception as exc_excel:
-                    with col_btn1:
-                        st.warning(f"No fue posible compilar en .xlsx ({exc_excel}). Descargue el archivo en formato CSV.")
-                
+                    st.download_button(
+                        label="Descargar Reporte Completo en Excel (.xlsx)",
+                        data=excel_bytes,
+                        file_name="Reporte_Biosensor_NIR.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    )
                 with col_btn2:
                     st.download_button(
                         label="Descargar en formato CSV",
