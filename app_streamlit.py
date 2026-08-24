@@ -1,130 +1,111 @@
-"""
-MÓDULO: app.py
-PROYECTO: SIMULACIÓN PARAMÉTRICA Y CARACTERIZACIÓN DE DESEMPEÑO DE UN SENSOR ÓPTICO NIR Y TRANSPORTE MICROFLUIDÍCO PARA EL MONITOREO DE GLUCOSA EN SUDOR
-PROGRAMA: Bioingeniería - Trabajo de Grado
-
-Descripción:
-    Aplicación interactiva construida con Streamlit para la simulación,
-    análisis paramétrico y validación clínica del biosensor.
-    Conecta los modelos físicos de óptica NIR y dinámica de fluidos.
-"""
-
 import streamlit as st
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
-import matplotlib.pyplot as plt
-from typing import Tuple, List
-
-# Importaciones de los módulos core del proyecto
 from core.modelo_optico import ModeloBeerLambertNIR
 from core.modelo_microfluido import ModeloMicrofluido
 
-# --- CONFIGURACIÓN DE PÁGINA ---
-st.set_page_config(
-    page_title="Biosensor NIR - Glucosa en Sudor",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+st.set_page_config(page_title="Biosensor NIR - Glucosa en Sudor", layout="wide")
 
-# --- SIDEBAR: CONTROLES ---
-st.sidebar.header("⚙️ Configuración del Sistema")
-
+# --- SIDEBAR COMPLETO ---
+st.sidebar.header("⚙️ Parámetros de Diseño y Simulación")
 st.sidebar.subheader("Óptica NIR")
-lambda_nm = st.sidebar.slider("Longitud de onda (λ) [nm]", 1000, 1700, 1600, step=1)
-L_mm = st.sidebar.slider("Camino óptico (L) [mm]", 0.1, 2.0, 1.0, step=0.1)
-noise_instrumental = st.sidebar.checkbox("Inyectar ruido fotométrico (+/- 5%)")
+lambda_nm = st.sidebar.slider("Longitud de onda (λ) [nm]", 1000, 1700, 1600, 1)
+L_mm = st.sidebar.slider("Camino óptico (L) [mm]", 0.1, 2.0, 1.0, 0.1)
+c_sim = st.sidebar.slider("Concentración de glucosa (C) [mM]", 0.01, 1.0, 0.20, 0.01)
+noise_instrumental = st.sidebar.checkbox("Inyectar ruido fotométrico instrumental (±5%)", value=False)
 
 st.sidebar.subheader("Microfluídica")
-Q_nlmin = st.sidebar.slider("Caudal (Q) [nL/min]", 1.0, 10.0, 5.0, step=0.1)
-w_um = st.sidebar.slider("Ancho canal (w) [µm]", 50, 500, 200, step=10)
-h_um = st.sidebar.slider("Alto canal (h) [µm]", 10, 200, 50, step=10)
+Q_nlmin = st.sidebar.slider("Caudal volumétrico (Q) [nL/min]", 1.0, 10.0, 5.0, 0.1)
+w_um = st.sidebar.slider("Ancho del canal (w) [µm]", 50, 500, 200, 10)
+h_um = st.sidebar.slider("Alto del canal (h) [µm]", 10, 200, 50, 10)
+largo_mm = st.sidebar.slider("Largo de celda [mm]", 0.5, 5.0, 1.0, 0.5)
 
-st.sidebar.subheader("Simulación Clínica")
-c_sim = st.sidebar.number_input("Concentración glucosa [mM]", 0.01, 1.0, 0.2, step=0.01)
+# --- MODELOS ---
+modelo_optico = ModeloBeerLambertNIR(longitud_optica_mm=L_mm)
+modelo_micro = ModeloMicrofluido(w_um, h_um, largo_mm, Q_nlmin)
 
-# --- INSTANCIACIÓN DE MODELOS ---
-modelo_optico = ModeloBeerLambertNIR(longitud_optica_mm=L_mm, incluir_desplazamiento_agua=True)
-modelo_micro = ModeloMicrofluido(ancho_um=w_um, alto_um=h_um, caudal_nL_min=Q_nlmin)
+def aplicar_ruido(valor):
+    return valor * np.random.uniform(0.95, 1.05) if noise_instrumental else valor
 
-# --- FUNCIÓN PARA APLICAR RUIDO ---
-def aplicar_ruido(valor: float) -> float:
-    if noise_instrumental:
-        return valor * np.random.uniform(0.95, 1.05)
-    return valor
-
-# --- PÁGINA PRINCIPAL ---
-st.title("🔬 Caracterización de Biosensor NIR para Glucosa en Sudor")
-
-tab1, tab2, tab3, tab4 = st.tabs([
-    "Óptica NIR", "Microfluídica", "Sensibilidad y Análisis", "Inferencia Clínica y Lotes"
-])
+# --- PÁGINAS ---
+st.title("🔬 Biosensor NIR: Simulación Integrada")
+tab1, tab2, tab3, tab4 = st.tabs(["Óptica NIR", "Microfluídica", "Sensibilidad", "Inferencia Clínica"])
 
 # Tab 1: Óptica
 with tab1:
-    st.subheader("Caracterización Óptica")
-    col1, col2 = st.columns(2)
-    
-    # Gráfica 1: Absorbancia vs C
     c_range = np.linspace(0.01, 1.0, 100)
-    abs_range = [aplicar_ruido(modelo_optico.absorbancia(c, lambda_nm)) for c in c_range]
+    abs_vals = [aplicar_ruido(modelo_optico.absorbancia(c, lambda_nm)) for c in c_range]
     
-    fig1 = go.Figure()
-    fig1.add_trace(go.Scatter(x=c_range, y=abs_range, mode='lines', name='Absorbancia Neta'))
+    col1, col2 = st.columns(2)
+    fig1 = go.Figure().add_trace(go.Scatter(x=c_range, y=abs_vals, name='Absorbancia neta con corrección'))
     fig1.update_layout(title="Absorbancia neta vs Concentración", xaxis_title="C [mM]", yaxis_title="A")
-    col1.plotly_chart(fig1, use_container_width=True)
-    
-    # Gráfica 2: Espectro
-    lambdas, abs_spectrum = modelo_optico.espectro_completo(c_sim)
-    fig2 = go.Figure()
-    fig2.add_trace(go.Scatter(x=lambdas, y=abs_spectrum, mode='lines', name='Espectro'))
-    fig2.add_vrect(x0=1600, x1=1700, fillcolor="lightgray", opacity=0.3, line_width=0)
-    fig2.update_layout(title="Espectro NIR", xaxis_title="λ [nm]", yaxis_title="Absorbancia")
-    col2.plotly_chart(fig2, use_container_width=True)
+    col1.plotly_chart(fig1)
+
+    lambdas, spect = modelo_optico.espectro_completo(c_sim)
+    fig2 = go.Figure().add_trace(go.Scatter(x=lambdas, y=spect, name='Espectro'))
+    fig2.add_vrect(x0=1600, x1=1700, fillcolor="lightgray", opacity=0.3)
+    fig2.update_layout(title="Espectro NIR", xaxis_title="λ [nm]", yaxis_title="A")
+    col2.plotly_chart(fig2)
+
+    st.latex(r"A_{\text{neta}}(\lambda) = (\epsilon_g(\lambda) - \epsilon_w(\lambda) \cdot \delta_w) \cdot C \cdot L")
+    A_actual = modelo_optico.absorbancia(c_sim, lambda_nm)
+    st.info(f"A λ = {lambda_nm} nm, L = {L_mm} mm y C = {c_sim} mM, la absorbancia neta es de **{A_actual:.5f} u.a.** La pendiente negativa responde al desplazamiento volumétrico del agua ($\delta_w \approx 6.15$): al disolverse glucosa, se excluye solvente, disminuyendo la absorción del agua.")
 
 # Tab 2: Microfluídica
 with tab2:
-    st.subheader("Análisis de Transporte Microfluídico")
     Q_range = np.linspace(1.0, 10.0, 50)
-    Re_vals = [ModeloMicrofluido(w_um, h_um, q).numero_reynolds() for q in Q_range]
-    Tr_vals = [ModeloMicrofluido(w_um, h_um, q).tiempo_residencia_s() for q in Q_range]
+    Re_vals = [ModeloMicrofluido(w_um, h_um, largo_mm, q).numero_reynolds() for q in Q_range]
+    tr_vals = [ModeloMicrofluido(w_um, h_um, largo_mm, q).tiempo_residencia_s() for q in Q_range]
     
-    fig3 = go.Figure()
-    fig3.add_trace(go.Scatter(x=Q_range, y=Re_vals, name='Re'))
-    fig3.add_hline(y=1.0, line_dash="dash", line_color="red", name="Límite Laminar (Re=1)")
+    col1, col2 = st.columns(2)
+    fig3 = go.Figure().add_trace(go.Scatter(x=Q_range, y=Re_vals, name='Re'))
+    fig3.add_hline(y=1.0, line_dash="dash", line_color="red")
     fig3.update_layout(title="Número de Reynolds vs Caudal", xaxis_title="Q [nL/min]", yaxis_title="Re")
-    st.plotly_chart(fig3, use_container_width=True)
+    col1.plotly_chart(fig3)
+    
+    fig4 = go.Figure().add_trace(go.Scatter(x=Q_range, y=tr_vals, name='t_r'))
+    fig4.update_layout(title="Tiempo de residencia vs Caudal", xaxis_title="Q [nL/min]", yaxis_title="t_r [s]")
+    col2.plotly_chart(fig4)
+    
+    st.latex(r"Re = \frac{2\rho Q}{\mu(w+h)} \quad \text{y} \quad t_r = \frac{V_{\text{celda}}}{Q}")
+    re_actual = modelo_micro.numero_reynolds()
+    st.info(f"Con Q={Q_nlmin} nL/min, Re = **{re_actual:.6f}** ({'Régimen Laminar' if re_actual < 1 else 'Flujo No Laminar'}). Velocidad media: **{modelo_micro.velocidad_media_m_s()*1e6:.2f} µm/s**. Tiempo de residencia: **{modelo_micro.tiempo_residencia_s():.2f} s**.")
 
 # Tab 3: Sensibilidad
 with tab3:
-    st.subheader("Análisis de Sensibilidad Paramétrica")
     L_range = np.linspace(0.1, 2.0, 50)
-    sens_vals = [modelo_optico.sensibilidad(lambda_nm) for _ in L_range]
+    sens_vals = [ModeloBeerLambertNIR(L).sensibilidad(lambda_nm) for L in L_range]
+    abs_vals_L = [ModeloBeerLambertNIR(L).absorbancia(c_sim, lambda_nm) for L in L_range]
     
-    fig4 = go.Figure()
-    fig4.add_trace(go.Scatter(x=L_range, y=sens_vals, name='dA/dC'))
-    fig4.update_layout(title="Sensibilidad (dA/dC) vs Camino óptico (L)", xaxis_title="L [mm]", yaxis_title="Sensibilidad")
-    st.plotly_chart(fig4, use_container_width=True)
+    col1, col2 = st.columns(2)
+    fig5 = go.Figure().add_trace(go.Scatter(x=L_range, y=sens_vals, name='dA/dC'))
+    fig5.update_layout(title="Sensibilidad vs Camino óptico", xaxis_title="L [mm]", yaxis_title="dA/dC")
+    col1.plotly_chart(fig5)
+    
+    fig6 = go.Figure().add_trace(go.Scatter(x=L_range, y=abs_vals_L, name='Absorbancia'))
+    fig6.update_layout(title="Absorbancia vs Camino óptico", xaxis_title="L [mm]", yaxis_title="A")
+    col2.plotly_chart(fig6)
+    
+    st.latex(r"\text{Sensibilidad} = \frac{\partial A}{\partial C} = (\epsilon_g(\lambda) - \epsilon_w(\lambda) \cdot \delta_w) \cdot L")
+    st.info("La sensibilidad aumenta linealmente con el camino óptico L, permitiendo amplificar la señal neta sin afectar la selectividad del desplazamiento del solvente.")
 
 # Tab 4: Inferencia
 with tab4:
-    st.subheader("Inferencia Clínica y Lotes")
-    
-    # Inferencia única
-    A_medida = st.number_input("Introducir Absorbancia medida (A)", 0.0, 5.0, 0.05)
-    if st.button("Estimar Concentración"):
-        c_est = modelo_optico.concentracion_inversa(A_medida, lambda_nm)
-        clas = modelo_optico.evaluar_clasificacion_fisiologica(c_est)
-        st.metric("Concentración Estimada", f"{c_est:.4f} mM")
-        st.write(f"**Clasificación:** {clas}")
+    st.subheader("Inferencia Clínica")
+    A_med = st.number_input("Absorbancia medida (A)", value=-0.05, step=0.001)
+    if st.button("Estimar"):
+        c_est = modelo_optico.concentracion_inversa(A_med, lambda_nm)
+        st.write(f"Concentración: {c_est:.4f} mM - {modelo_optico.evaluar_clasificacion_fisiologica(c_est)}")
         
-    # Lotes
     st.markdown("---")
-    st.subheader("Simulación por Lotes (CSV)")
-    uploaded_file = st.file_uploader("Subir archivo CSV con columna 'Absorbancia'", type="csv")
-    if uploaded_file:
-        df_lote = pd.read_csv(uploaded_file)
-        if "Absorbancia" in df_lote.columns:
-            df_lote["Glucosa [mM]"] = df_lote["Absorbancia"].apply(lambda a: modelo_optico.concentracion_inversa(a, lambda_nm))
+    uploaded = st.file_uploader("Subir CSV de lotes", type="csv")
+    if uploaded:
+        df_lote = pd.read_csv(uploaded)
+        if 'absorbancia_1600nm' in df_lote.columns:
+            df_lote["Glucosa_Estimada_mM"] = df_lote['absorbancia_1600nm'].apply(lambda a: modelo_optico.concentracion_inversa(a, 1600))
+            if 'glucosa_referencia_mM' in df_lote.columns:
+                df_lote["Error_%"] = ((df_lote["Glucosa_Estimada_mM"] - df_lote['glucosa_referencia_mM']) / df_lote['glucosa_referencia_mM']) * 100
+            df_lote["Clasificación_Metabólica"] = df_lote["Glucosa_Estimada_mM"].apply(modelo_optico.evaluar_clasificacion_fisiologica)
             st.dataframe(df_lote)
-            st.download_button("Descargar Resultados", df_lote.to_csv(index=False), "resultados.csv")
+            st.download_button("Descargar CSV", df_lote.to_csv(index=False), "resultados.csv")
