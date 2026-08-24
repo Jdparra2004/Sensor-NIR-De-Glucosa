@@ -3,6 +3,8 @@ app_streamlit.py — Interfaz interactiva del Biosensor NIR
 PROYECTO: Simulación paramétrica de detección óptica NIR de glucosa en sudor
 """
 
+import io
+import time
 import streamlit as st
 import numpy as np
 import pandas as pd
@@ -41,6 +43,48 @@ modelo_micro = ModeloMicrofluido(w_um, h_um, largo_mm, Q_nlmin)
 
 def aplicar_ruido(valor):
     return valor * np.random.uniform(0.95, 1.05) if noise_instrumental else valor
+
+def generar_excel_multihoja(df_resultado, lambda_val, L_val):
+    """Genera un archivo Excel estructurado en memoria con múltiples hojas de análisis."""
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        # Hoja 1: Datos Detallados Muestra por Muestra
+        df_resultado.to_excel(writer, sheet_name='Datos_Procesados', index=False)
+        
+        # Hoja 2: Distribución y Frecuencia Clínica
+        if "Clasificación_Metabólica" in df_resultado.columns:
+            resumen_clinico = df_resultado["Clasificación_Metabólica"].value_counts().reset_index()
+            resumen_clinico.columns = ["Categoría Fisiológica", "Total Muestras"]
+            resumen_clinico["Porcentaje (%)"] = (resumen_clinico["Total Muestras"] / len(df_resultado) * 100).round(2)
+            resumen_clinico.to_excel(writer, sheet_name='Resumen_Clasificacion', index=False)
+        
+        # Hoja 3: Parámetros del Ensayo Óptico
+        metricas = {
+            "Parámetro": [
+                "Longitud de onda (λ)",
+                "Camino óptico (L)",
+                "Total de muestras evaluadas",
+                "Concentración media estimada",
+                "Concentración mínima",
+                "Concentración máxima"
+            ],
+            "Valor": [
+                f"{lambda_val} nm",
+                f"{L_val} mm",
+                len(df_resultado),
+                f"{df_resultado['Glucosa_Estimada_mM'].mean():.4f} mM",
+                f"{df_resultado['Glucosa_Estimada_mM'].min():.4f} mM",
+                f"{df_resultado['Glucosa_Estimada_mM'].max():.4f} mM"
+            ]
+        }
+        if "Error_%" in df_resultado.columns:
+            metricas["Parámetro"].append("Error relativo promedio")
+            metricas["Valor"].append(f"{df_resultado['Error_%'].mean():.2f} %")
+            
+        df_params = pd.DataFrame(metricas)
+        df_params.to_excel(writer, sheet_name='Parametros_Simulacion', index=False)
+        
+    return output.getvalue()
 
 # --- PÁGINAS ---
 st.title("Biosensor NIR: Simulación Integrada")
@@ -164,20 +208,31 @@ with tab4:
         st.write(f"Concentración estimada: **{c_est:.4f} mM** — Clasificación: **{modelo_optico.evaluar_clasificacion_fisiologica(c_est)}**")
         
     st.markdown("---")
-    st.subheader("Procesamiento por Lotes (CSV)")
+    st.subheader("Procesamiento por Lotes")
     uploaded = st.file_uploader("Subir archivo CSV de muestras", type=["csv", "txt"])
+    
     if uploaded is not None:
+        progreso_contenedor = st.container()
+        barra_progreso = progreso_contenedor.progress(0)
+        estado_texto = progreso_contenedor.empty()
+        
         try:
-            # Intento de lectura con C engine rápido
+            # Paso 1: Carga optimizada
+            estado_texto.text("Paso 1/4: Leyendo archivo en memoria...")
+            barra_progreso.progress(25)
+            
             try:
                 uploaded.seek(0)
                 df_lote = pd.read_csv(uploaded)
             except Exception:
-                # Fallback con motor Python sin pasar el parámetro low_memory
                 uploaded.seek(0)
                 df_lote = pd.read_csv(uploaded, sep=None, engine="python")
             
-            # Detección flexible de la columna de absorbancia
+            # Paso 2: Detección de columnas
+            estado_texto.text("Paso 2/4: Identificando canal óptico de absorbancia...")
+            barra_progreso.progress(50)
+            time.sleep(0.1)
+            
             col_abs = None
             candidatos_abs = ['absorbancia_1600nm', 'absorbancia_1650nm', 'absorbancia_medida', 'absorbancia', 'Absorbance', 'A']
             for cand in candidatos_abs:
@@ -192,6 +247,10 @@ with tab4:
                         break
 
             if col_abs is not None:
+                # Paso 3: Cálculo e inferencia
+                estado_texto.text(f"Paso 3/4: Ejecutando inferencia inversa sobre {len(df_lote):,} registros...")
+                barra_progreso.progress(75)
+                
                 valores_abs = pd.to_numeric(df_lote[col_abs], errors="coerce")
                 df_lote["Glucosa_Estimada_mM"] = valores_abs.apply(
                     lambda a: modelo_optico.concentracion_inversa(float(a), lambda_nm) if pd.notna(a) else np.nan
@@ -207,18 +266,40 @@ with tab4:
                     lambda c: modelo_optico.evaluar_clasificacion_fisiologica(c) if pd.notna(c) else "Indeterminado"
                 )
                 
-                # Mostrar primeras filas si el archivo es muy grande para no sobrecargar el navegador
+                # Paso 4: Consolidación final
+                estado_texto.text("Paso 4/4: Generando reporte estructurado...")
+                barra_progreso.progress(100)
+                time.sleep(0.2)
+                
+                # Limpiar barra tras completar
+                barra_progreso.empty()
+                estado_texto.success(f"Procesamiento completado: {len(df_lote):,} muestras analizadas correctamente.")
+                
                 st.dataframe(df_lote.head(1000))
                 if len(df_lote) > 1000:
-                    st.caption(f"Mostrando las primeras 1,000 filas de un total de {len(df_lote):,} registros procesados.")
+                    st.caption(f"Mostrando una vista previa de las primeras 1,000 filas de un total de {len(df_lote):,} registros.")
                 
-                st.download_button(
-                    label="Descargar CSV Procesado",
-                    data=df_lote.to_csv(index=False).encode("utf-8"),
-                    file_name="resultados_procesamiento_lote.csv",
-                    mime="text/csv"
-                )
+                # Generación del archivo Excel en memoria
+                excel_bytes = generar_excel_multihoja(df_lote, lambda_nm, L_mm)
+                
+                col_btn1, col_btn2 = st.columns(2)
+                with col_btn1:
+                    st.download_button(
+                        label="Descargar Reporte Completo en Excel (.xlsx)",
+                        data=excel_bytes,
+                        file_name="Reporte_Biosensor_NIR.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    )
+                with col_btn2:
+                    st.download_button(
+                        label="Descargar en formato CSV",
+                        data=df_lote.to_csv(index=False).encode("utf-8"),
+                        file_name="resultados_procesamiento_lote.csv",
+                        mime="text/csv"
+                    )
             else:
-                st.error("No se detectó una columna de absorbancia válida en el archivo CSV subido.")
+                barra_progreso.empty()
+                estado_texto.error("No se detectó una columna de absorbancia válida en el archivo cargado.")
         except Exception as e:
-            st.error(f"Error al procesar el archivo CSV: {e}")
+            barra_progreso.empty()
+            estado_texto.error(f"Error al procesar el archivo: {e}")
