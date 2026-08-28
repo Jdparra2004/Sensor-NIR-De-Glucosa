@@ -19,3 +19,8 @@ dist/
 
 #Graphify
 graphify-out/
+outputs/
+data/
+*.csv
+*.xlsx
+*.txt
