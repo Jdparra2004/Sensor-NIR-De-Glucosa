@@ -338,7 +338,7 @@ with tab4:
         * **Columna de referencia (Opcional):** Encabezados válidos: `glucosa_referencia_mM`, `Glucosa_Real_mM`, `glucosa_mM` o `C_real`. Valores en **mM** (milimolar) para el cálculo del *Error Relativo (%)*.
         * **Identificador (Opcional):** `id_muestra` (alfanumérico).
 
-        ⚠️ **Nota sobre el Error Relativo (%):** Este valor muestra la desviación porcentual de la estimación respecto a la referencia experimental ($\left| \frac{\text{Est}-\text{Ref}}{\text{Ref}} \right| \times 100$). Valores elevados sugieren discrepancias entre el modelo físico teórico y los datos medidos; úselo para identificar muestras o rangos de concentración donde el modelo requiere ajuste.
+        ⚠️ **Nota sobre el Error Relativo (%):** Este valor muestra la desviación porcentual de la estimación respecto a la referencia experimental ( |Estimación - Referencia| / Referencia * 100 ). Valores elevados sugieren discrepancias entre el modelo físico teórico y los datos medidos; úselo para identificar muestras o rangos de concentración donde el modelo requiere ajuste.
         """)
 
     uploaded = st.file_uploader("Subir archivo de muestras (CSV, Parquet)", type=["csv", "parquet"])
