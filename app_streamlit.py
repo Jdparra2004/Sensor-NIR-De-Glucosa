@@ -416,15 +416,18 @@ with tab4:
                     col_ref = next((c for c in candidatos_ref if c in df_lote.columns), None)
             
             # --- CÁLCULO DE MÉTRICAS SI HAY REFERENCIA ---
-            if 'Glucosa_Estimada_mM' in df_lote.columns:
+            # Crear una copia para evitar fragmentación y agregar columnas de manera eficiente
+            df_resultado = df_lote.copy()
+            
+            if 'Glucosa_Estimada_mM' in df_resultado.columns:
                 candidatos_ref = ['Glucose (mM)', 'glucosa_referencia_mM', 'Glucosa_Real_mM', 'glucosa_mM', 'glucose_mM', 'C_real']
-                col_ref = next((c for c in candidatos_ref if c in df_lote.columns), None)
+                col_ref = next((c for c in candidatos_ref if c in df_resultado.columns), None)
                 if col_ref is not None:
-                    c_real = pd.to_numeric(df_lote[col_ref], errors="coerce")
-                    # Renombrado de Error_% a Error Relativo (%)
-                    df_lote["Error Relativo (%)"] = (np.abs(df_lote["Glucosa_Estimada_mM"] - c_real) / np.where(c_real != 0, c_real, 1e-12) * 100).round(2)
+                    c_real = pd.to_numeric(df_resultado[col_ref], errors="coerce")
+                    # Cálculo vectorizado sin fragmentación
+                    df_resultado["Error Relativo (%)"] = (np.abs(df_resultado["Glucosa_Estimada_mM"] - c_real) / np.where(c_real != 0, c_real, 1e-12) * 100).round(2)
                 
-                df_lote["Clasificación_Metabólica"] = df_lote["Glucosa_Estimada_mM"].apply(
+                df_resultado["Clasificación_Metabólica"] = df_resultado["Glucosa_Estimada_mM"].apply(
                     lambda c: modelo_optico.evaluar_clasificacion_fisiologica(c) if pd.notna(c) else "Indeterminado"
                 )
                 
@@ -433,16 +436,16 @@ with tab4:
                 time.sleep(0.05)
                 
                 barra_progreso.empty()
-                estado_texto.success(f"Procesamiento completado: {len(df_lote):,} muestras analizadas bajo λ = {lambda_nm} nm y L = {L_mm} mm.")
+                estado_texto.success(f"Procesamiento completado: {len(df_resultado):,} muestras analizadas bajo λ = {lambda_nm} nm y L = {L_mm} mm.")
                 
-                st.dataframe(df_lote)
+                st.dataframe(df_resultado)
                 
                 # --- GRÁFICOS DE ANÁLISIS DEL LOTE ---
                 st.markdown("#### Análisis Estadístico y Fisiológico del Lote")
                 col_g1, col_g2 = st.columns(2)
                 
                 # Gráfico 1: Conteo por Categoría Fisiológica
-                conteo_df = df_lote["Clasificación_Metabólica"].value_counts().reset_index()
+                conteo_df = df_resultado["Clasificación_Metabólica"].value_counts().reset_index()
                 conteo_df.columns = ["Categoría", "Muestras"]
                 
                 colores_map = {
@@ -472,11 +475,11 @@ with tab4:
                 
                 # Gráfico 2: Dispersión de Concentración Estimada con Umbrales
                 fig_lote_disp = go.Figure()
-                indices_muestras = list(range(1, len(df_lote) + 1))
+                indices_muestras = list(range(1, len(df_resultado) + 1))
                 
                 fig_lote_disp.add_trace(go.Scatter(
                     x=indices_muestras,
-                    y=df_lote["Glucosa_Estimada_mM"],
+                    y=df_resultado["Glucosa_Estimada_mM"],
                     mode="markers",
                     name="Glucosa Estimada (mM)",
                     marker=dict(color="#1f77b4", size=5, opacity=0.7)
@@ -497,7 +500,7 @@ with tab4:
                 
                 # Exportación
                 col_btn1, col_btn2 = st.columns(2)
-                excel_bytes = generar_excel_multihoja_estetico(df_lote, lambda_nm, L_mm)
+                excel_bytes = generar_excel_multihoja_estetico(df_resultado, lambda_nm, L_mm)
                 
                 with col_btn1:
                     if excel_bytes is not None:
@@ -513,13 +516,11 @@ with tab4:
                 with col_btn2:
                     st.download_button(
                         label="Descargar en formato CSV",
-                        data=df_lote.to_csv(index=False).encode("utf-8"),
+                        data=df_resultado.to_csv(index=False).encode("utf-8"),
                         file_name="resultados_procesamiento_lote.csv",
                         mime="text/csv"
                     )
-            else:
-                barra_progreso.empty()
-                estado_texto.error("No se detectó una columna de absorbancia válida en el archivo cargado.")
+
         except Exception as e:
             barra_progreso.empty()
             estado_texto.error(f"Error al procesar el archivo: {e}")
