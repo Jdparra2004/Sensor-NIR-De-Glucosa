@@ -399,7 +399,7 @@ with tab4:
                 
                 valores_abs = pd.to_numeric(df_lote[col_abs], errors="coerce")
                 df_lote["Glucosa_Estimada_mM"] = valores_abs.apply(
-                    lambda a: modelo_optico.concentracion_inversa(float(a), lambda_nm) if pd.notna(a) else np.nan
+                    lambda a: modelo_optico.concentracion_inversa(float(a), lambda_nm, alpha=alpha, beta=beta) if pd.notna(a) else np.nan
                 ).round(4)
                 
                 candidatos_ref = ['glucosa_referencia_mM', 'Glucosa_Real_mM', 'glucosa_mM', 'glucose_mM', 'C_real']

@@ -87,19 +87,24 @@ class ModeloBeerLambertNIR:
         eps_net = self.obtener_coeficiente_neto(lambda_nm)
         return eps_net * concentracion_mM * self.longitud_optica_mm
 
-    def concentracion_inversa(self, absorbancia: float, lambda_nm: float) -> float:
+    def concentracion_inversa(self, absorbancia: float, lambda_nm: float, alpha: float = None, beta: float = None) -> float:
         """
         Calcula la concentración molar C (mM) a partir de la absorbancia A_neta.
         Aplica calibración empírica: C_final = (C_teórica * alpha) + beta.
+        Permite override de alpha/beta para inferencia de lote.
         """
         L = self.longitud_optica_mm
         eps_net = self.obtener_coeficiente_neto(lambda_nm)
         
+        alpha_val = alpha if alpha is not None else self.alpha
+        beta_val = beta if beta is not None else self.beta
+        
         if np.isclose(eps_net, 0.0) or np.isclose(L, 0.0):
-            return 0.0 + self.beta
+            return 0.0 + beta_val
         
         c_teorica = float(abs(absorbancia) / (abs(eps_net) * L))
-        return (c_teorica * self.alpha) + self.beta
+        c_final = (c_teorica * alpha_val) + beta_val
+        return max(0.0, c_final) # No concentraciones negativas
 
     def evaluar_clasificacion_fisiologica(self, concentracion_mM: float) -> str:
         """Clasifica la concentración de glucosa en sudor en rangos metabólicos clínicos."""

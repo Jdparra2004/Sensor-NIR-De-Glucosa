@@ -58,7 +58,7 @@ class TestSensorNIR(unittest.TestCase):
         """Verifica que el motor de inferencia recupere la concentración original."""
         C_original = 0.15
         A_calculada = self.modelo_optico.absorbancia(C_original, LAMBDA_REFERENCIA_NM)
-        C_inversa = self.modelo_optico.concentracion_inversa(A_calculada, LAMBDA_REFERENCIA_NM)
+        C_inversa = self.modelo_optico.concentracion_inversa(A_calculada, LAMBDA_REFERENCIA_NM, alpha=1.0, beta=0.0)
         self.assertAlmostEqual(C_original, C_inversa, places=5)
 
     def test_diagnostico_clinico_tres_casos(self):
@@ -122,7 +122,7 @@ class TestSensorNIR(unittest.TestCase):
         self.assertFalse(df.empty)
         sample = df.head(5).copy()
         col_abs = "absorbancia_medida" if "absorbancia_medida" in sample.columns else sample.columns[1]
-        sample["c_est"] = sample[col_abs].apply(lambda a: self.modelo_optico.concentracion_inversa(float(a), LAMBDA_REFERENCIA_NM))
+        sample["c_est"] = sample[col_abs].apply(lambda a: self.modelo_optico.concentracion_inversa(float(a), LAMBDA_REFERENCIA_NM, alpha=1.0, beta=0.0))
         self.assertEqual(len(sample), 5)
         self.assertIn("c_est", sample.columns)
 
