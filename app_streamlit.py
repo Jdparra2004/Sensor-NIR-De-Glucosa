@@ -340,7 +340,7 @@ with tab4:
         ⚠️ **Recomendación de Rendimiento:** Se aconseja cargar archivos con un máximo de **1,000 filas** para asegurar una respuesta fluida. Si se sube un lote mayor, el sistema procesará y graficará automáticamente las primeras 1,000 muestras.
         """)
 
-    uploaded = st.file_uploader("Subir archivo CSV de muestras", type=["csv", "txt"])
+    uploaded = st.file_uploader("Subir archivo de muestras (CSV, TXT, Parquet)", type=["csv", "txt", "parquet"])
     
     if uploaded is not None:
         progreso_contenedor = st.container()
@@ -351,12 +351,18 @@ with tab4:
             estado_texto.text("Paso 1/4: Leyendo archivo en memoria...")
             barra_progreso.progress(25)
             
-            try:
-                uploaded.seek(0)
-                df_lote = pd.read_csv(uploaded)
-            except Exception:
-                uploaded.seek(0)
-                df_lote = pd.read_csv(uploaded, sep=None, engine="python")
+            # Detectar tipo de archivo
+            file_ext = os.path.splitext(uploaded.name)[1].lower()
+            
+            if file_ext == '.parquet':
+                df_lote = pd.read_parquet(uploaded)
+            else:
+                try:
+                    uploaded.seek(0)
+                    df_lote = pd.read_csv(uploaded)
+                except Exception:
+                    uploaded.seek(0)
+                    df_lote = pd.read_csv(uploaded, sep=None, engine="python")
             
             # Validación y limitación a 1,000 filas
             total_filas_original = len(df_lote)
