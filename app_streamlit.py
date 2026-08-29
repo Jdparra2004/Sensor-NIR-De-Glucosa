@@ -119,9 +119,9 @@ def generar_excel_multihoja_estetico(df_resultado, lambda_val, L_val):
                 f"{c_validos.max():.4f} mM" if not c_validos.empty else "N/A"
             ]
         }
-        if "Error_%" in df_resultado.columns and not df_resultado["Error_%"].dropna().empty:
+        if "Error Relativo (%)" in df_resultado.columns and not df_resultado["Error Relativo (%)"].dropna().empty:
             metricas["Parámetro de Simulación"].append("Error relativo medio poblacional")
-            metricas["Valor"].append(f"{df_resultado['Error_%'].dropna().mean():.2f} %")
+            metricas["Valor"].append(f"{df_resultado['Error Relativo (%)'].dropna().mean():.2f} %")
             
         df_params = pd.DataFrame(metricas)
         df_params.to_excel(writer, sheet_name='Parametros_Diseno', index=False)
@@ -333,15 +333,15 @@ with tab4:
         **Condiciones de Análisis Activas:**
         * Los datos del archivo se evalúan en tiempo real con la **Longitud de onda ($\lambda = {lambda_nm}\text{{ nm}}$)** y el **Camino óptico ($L = {L_mm}\text{{ mm}}$)** configurados en la barra lateral (*sidebar*).
         
-        **Estructura y Unidades Requeridas en el CSV:**
-        * **Columna de absorbancia (Obligatoria):** Encabezados válidos: `absorbancia_medida`, `absorbancia_1600nm`, `absorbancia_1650nm`, `absorbancia` o `A`. Valores en **u.a.** (unidades de absorbancia neta).
-        * **Columna de referencia (Opcional):** Encabezados válidos: `glucosa_referencia_mM`, `Glucosa_Real_mM`, `glucosa_mM` o `C_real`. Valores en **mM** (milimolar) para el cálculo de error porcentual.
+        **Estructura y Unidades Requeridas en el CSV/Parquet:**
+        * **Columna de absorbancia (Obligatoria):** Encabezados válidos: `absorbancia_1600nm`, `absorbancia_1650nm`, `absorbancia`, o `A`. Valores en **u.a.** (unidades de absorbancia neta).
+        * **Columna de referencia (Opcional):** Encabezados válidos: `glucosa_referencia_mM`, `Glucosa_Real_mM`, `glucosa_mM` o `C_real`. Valores en **mM** (milimolar) para el cálculo del *Error Relativo (%)*.
         * **Identificador (Opcional):** `id_muestra` (alfanumérico).
 
-        ⚠️ **Recomendación de Rendimiento:** Se aconseja cargar archivos con un máximo de **1,000 filas** para asegurar una respuesta fluida. Si se sube un lote mayor, el sistema procesará y graficará automáticamente las primeras 1,000 muestras.
+        ⚠️ **Nota sobre el Error Relativo (%):** Este valor muestra la desviación porcentual de la estimación respecto a la referencia experimental ($\left| \frac{\text{Est}-\text{Ref}}{\text{Ref}} \right| \times 100$). Valores elevados sugieren discrepancias entre el modelo físico teórico y los datos medidos; úselo para identificar muestras o rangos de concentración donde el modelo requiere ajuste.
         """)
 
-    uploaded = st.file_uploader("Subir archivo de muestras (CSV, TXT, Parquet)", type=["csv", "txt", "parquet"])
+    uploaded = st.file_uploader("Subir archivo de muestras (CSV, Parquet)", type=["csv", "parquet"])
     
     if uploaded is not None:
         progreso_contenedor = st.container()
@@ -361,9 +361,6 @@ with tab4:
                 try:
                     uploaded.seek(0)
                     df_lote = pd.read_csv(uploaded, encoding='utf-8')
-                except UnicodeDecodeError:
-                    uploaded.seek(0)
-                    df_lote = pd.read_csv(uploaded, sep=None, engine="python", encoding='utf-16')
                 except Exception:
                     uploaded.seek(0)
                     df_lote = pd.read_csv(uploaded, sep=None, engine="python")
@@ -404,7 +401,8 @@ with tab4:
                 col_ref = next((c for c in candidatos_ref if c in df_lote.columns), None)
                 if col_ref is not None:
                     c_real = pd.to_numeric(df_lote[col_ref], errors="coerce")
-                    df_lote["Error_%"] = (np.abs(df_lote["Glucosa_Estimada_mM"] - c_real) / np.where(c_real != 0, c_real, 1e-12) * 100).round(2)
+                    # Renombrado de Error_% a Error Relativo (%)
+                    df_lote["Error Relativo (%)"] = (np.abs(df_lote["Glucosa_Estimada_mM"] - c_real) / np.where(c_real != 0, c_real, 1e-12) * 100).round(2)
                 
                 df_lote["Clasificación_Metabólica"] = df_lote["Glucosa_Estimada_mM"].apply(
                     lambda c: modelo_optico.evaluar_clasificacion_fisiologica(c) if pd.notna(c) else "Indeterminado"
