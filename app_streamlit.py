@@ -227,12 +227,13 @@ with tab1:
     col2.plotly_chart(fig2)
 
     with st.container(border=True):
-        st.latex(r"A_{\text{neta}}(\lambda) = \left( \epsilon_g(\lambda) - \epsilon_w(\lambda) \cdot \delta_w \right) \cdot C \cdot L")
+        st.latex(r"C_{\text{final}} = \alpha \cdot \left( \frac{|A_{\text{neta}}|}{|\epsilon_{\text{net}}(\lambda)| \cdot L} \right) + \beta")
         A_actual = modelo_optico.absorbancia(c_sim, lambda_nm)
         st.info(
-            rf"A $\lambda = {lambda_nm}\text{{ nm}}$, $L = {L_mm}\text{{ mm}}$ y $C = {c_sim}\text{{ mM}}$, la absorbancia neta es de **{A_actual:.5f} u.a.** "
-            rf"La pendiente negativa responde al desplazamiento volumétrico del agua ($\delta_w \approx 6.15$): "
-            rf"al disolverse glucosa, se excluye solvente, disminuyendo la absorción del agua."
+            rf"Configuración: $\lambda = {lambda_nm}\text{{ nm}}$, $L = {L_mm}\text{{ mm}}$, "
+            rf"$\alpha = {alpha}$, $\beta = {beta}$. "
+            rf"Para una concentración teórica de $C = {c_sim}\text{{ mM}}$, "
+            rf"la estimación ajustada resulta en **{modelo_optico.concentracion_inversa(A_actual, lambda_nm):.5f} mM**."
         )
 
 # Tab 2: Microfluídica
