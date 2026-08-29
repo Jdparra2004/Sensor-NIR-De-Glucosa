@@ -4,6 +4,7 @@ PROYECTO: Simulación paramétrica de detección óptica NIR de glucosa en sudor
 """
 
 import io
+import os
 import time
 import streamlit as st
 import numpy as np
