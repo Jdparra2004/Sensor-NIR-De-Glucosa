@@ -333,26 +333,36 @@ with tab4:
     st.markdown("---")
     st.subheader("Procesamiento por Lotes")
     
-    with st.expander("ℹ️ Guía de formato y Fundamentos Teóricos", expanded=False):
+    with st.expander("ℹ️ Guía detallada: Estructura de archivos para Lotes", expanded=False):
         st.markdown(rf"""
-        **Condiciones de Análisis Activas:**
-        * Los datos del archivo se evalúan en tiempo real con la **Longitud de onda ($\lambda = {lambda_nm}\text{{ nm}}$)** y el **Camino óptico ($L = {L_mm}\text{{ mm}}$)** configurados en la barra lateral (*sidebar*).
+        ### Formatos Preferidos
+        El sistema procesa archivos `.txt` (tab-separated), `.csv` (comma-separated) y `.parquet`. Se **recomienda el formato `.txt`** por su compatibilidad con grandes matrices espectrales.
+
+        ### Estructura Requerida
+        Para un análisis multivariante (PLS-R) exitoso, el archivo debe estructurarse de la siguiente manera:
         
-        **Flujo de Procesamiento Espectral (Multivariante):**
-        1. **Pre-procesamiento:** Filtrado de 2956 canales para eliminar regiones ruidosas (<500nm, crossover 1090-1110nm, absorción de agua 1800-2100nm, >2300nm).
-        2. **Calibración:** Entrenamiento PLS-R con selección automática de componentes latentes (CV-5fold).
-        3. **Inferencia:** Cálculo de concentración mediante regresión sobre vectores de carga optimizados.
-        
-        **Formulación Matemática (PLS-R):**
+        1. **Matriz Espectral (Obligatoria):**
+           - Cada columna debe representar una longitud de onda.
+           - Los **encabezados** deben ser estrictamente numéricos (ej. `400`, `400.5`, `2499.5`).
+           - Si existen espacios en los nombres de las columnas, el sistema intentará limpiarlos automáticamente.
+
+        2. **Columna de Referencia (Opcional, para métricas):**
+           - Permite calcular RMSEP y Error Relativo.
+           - Encabezados aceptados (sin espacios extra): `Glucose (mM)`, `glucosa_referencia_mM`, `Glucosa_Real_mM`, `glucosa_mM`, `C_real`.
+
+        ### Ejemplo de archivo `.txt` (formato tabulado)
+        ```text
+        Glucose (mM)	400	400.5	...	2499.5
+        25.0	0.123	0.125	...	0.850
+        10.0	0.090	0.092	...	0.780
+        ```
+        *Nota: Asegúrese de usar codificación `UTF-16` si el archivo proviene de software especializado de espectroscopia.*
+
+        ### Fundamentos Teóricos (PLS-R)
         * **Descomposición:** $X = T P^T + E$, $y = T q + f$
         * **Regresión:** $b_{{PLS}} = W (P^T W)^{{-1}} q$
         * **Predicción:** $C_{{pred}} = b_0 + X_{{valid}} b_{{PLS}}$
         * **Ajuste:** $C_{{final}} = \alpha \cdot C_{{pred}} + \beta$
-
-        **Estructura Requerida en el CSV/Parquet:**
-        * **Columna de absorbancia (Legacy):** `absorbancia`, `A`, etc.
-        * **Matriz Espectral (Multivariante):** Columnas con encabezados numéricos (ej. `1000.5`, `1001.0`).
-        * **Columna de referencia (Opcional):** `Glucosa_Real_mM` (para métricas RMSEP).
         """)
 
     uploaded = st.file_uploader("Subir archivo de muestras (CSV, Parquet, TXT)", type=["csv", "parquet", "txt"])
