@@ -392,6 +392,8 @@ with tab4:
             time.sleep(0.05)
             
             # --- DETECCIÓN DE ESPECTRO COMPLETO (400 - 2500 nm) ---
+            # Limpiar espacios en blanco de los encabezados para detectar números
+            df_lote.columns = df_lote.columns.str.strip()
             espectro_cols = [c for c in df_lote.columns if c.replace('.','',1).isdigit()]
             
             if len(espectro_cols) > 100: # Heurística para detectar matriz espectral
