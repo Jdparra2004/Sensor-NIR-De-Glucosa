@@ -123,9 +123,12 @@ def generar_excel_multihoja_estetico(df_resultado, lambda_val, L_val):
                 f"{c_validos.max():.4f} mM" if not c_validos.empty else "N/A"
             ]
         }
-        if "Error Relativo (%)" in df_resultado.columns and not df_resultado["Error Relativo (%)"].dropna().empty:
-            metricas["Parámetro de Simulación"].append("Error relativo medio poblacional")
-            metricas["Valor"].append(f"{df_resultado['Error Relativo (%)'].dropna().mean():.2f} %")
+        
+        # Filtrar muestras válidas para el cálculo del error relativo
+        df_validos = df_resultado[df_resultado["Clasificación_Metabólica"] != "Indeterminado"].copy()
+        if "Error Relativo (%)" in df_validos.columns and not df_validos["Error Relativo (%)"].dropna().empty:
+            metricas["Parámetro de Simulación"].append("Error relativo medio (muestras válidas)")
+            metricas["Valor"].append(f"{df_validos['Error Relativo (%)'].dropna().mean():.2f} %")
             
         df_params = pd.DataFrame(metricas)
         df_params.to_excel(writer, sheet_name='Parametros_Diseno', index=False)
@@ -134,58 +137,14 @@ def generar_excel_multihoja_estetico(df_resultado, lambda_val, L_val):
     output.seek(0)
     wb = openpyxl.load_workbook(output)
     
-    # Estilos tipográficos y cromáticos
-    header_fill = PatternFill(start_color="1F4E79", end_color="1F4E79", fill_type="solid")
-    header_font = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
-    cell_font = Font(name="Calibri", size=10)
-    center_align = Alignment(horizontal="center", vertical="center")
-    thin_border = Border(
-        left=Side(style='thin', color='D9D9D9'),
-        right=Side(style='thin', color='D9D9D9'),
-        top=Side(style='thin', color='D9D9D9'),
-        bottom=Side(style='thin', color='D9D9D9')
-    )
-    
-    fill_normal = PatternFill(start_color="E2EFDA", end_color="E2EFDA", fill_type="solid")
-    fill_alerta = PatternFill(start_color="FFF2CC", end_color="FFF2CC", fill_type="solid")
-    fill_hiper = PatternFill(start_color="FCE4D6", end_color="FCE4D6", fill_type="solid")
-    
-    for ws in wb.worksheets:
-        ws.sheet_state = 'visible'
-        ws.views.sheetView[0].showGridLines = True
-        
-        # Formatear encabezado
-        for cell in ws[1]:
-            cell.fill = header_fill
-            cell.font = header_font
-            cell.alignment = center_align
-        
-        # Formatear cuerpo y colorear categorías clínicas
-        for row in ws.iter_rows(min_row=2, max_row=ws.max_row, min_col=1, max_col=ws.max_column):
-            for cell in row:
-                cell.font = cell_font
-                cell.border = thin_border
-                cell.alignment = center_align
-                
-                # Resaltado condicional por texto de diagnóstico
-                if str(cell.value) == "Normal":
-                    cell.fill = fill_normal
-                elif "Alerta" in str(cell.value):
-                    cell.fill = fill_alerta
-                elif "Elevado" in str(cell.value) or "Hiperglucemia" in str(cell.value):
-                    cell.fill = fill_hiper
+    # Asegurar que al menos una hoja sea visible (solución al error "At least one sheet must be visible")
+    if len(wb.worksheets) > 0:
+        wb.active = 0
+    else:
+        # Crear hoja vacía si no hay ninguna
+        wb.create_sheet("Sin_Datos")
+        wb.active = 0
 
-        # Autoajuste dinámico de ancho de columnas
-        for col in ws.columns:
-            max_len = max(len(str(cell.value or '')) for cell in col)
-            col_letter = get_column_letter(col[0].column)
-            ws.column_dimensions[col_letter].width = max(max_len + 4, 12)
-            
-    wb.active = 0
-    final_output = io.BytesIO()
-    wb.save(final_output)
-    final_output.seek(0)
-    return final_output.getvalue()
 
 # --- PÁGINAS ---
 st.title("Biosensor NIR: Simulación Integrada")
