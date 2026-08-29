@@ -135,6 +135,8 @@ class ModeloBeerLambertNIR:
         return np.array([self.absorbancia(c, lambda_nm) for c in concentraciones], dtype=float)
 
 
+from sklearn.model_selection import LeaveOneOut, cross_val_score
+
 class ModeloPLSRegresionNIR:
     """
     Modelo quimiométrico multivariante basado en Regresión por Mínimos Cuadrados
@@ -142,17 +144,16 @@ class ModeloPLSRegresionNIR:
     a partir de espectros completos de absorbancia.
     """
 
-    def __init__(self, n_componentes: int = 11, alpha: float = 1.0, beta: float = 0.0):
-        self.n_componentes = int(n_componentes)
+    def __init__(self, alpha: float = 1.0, beta: float = 0.0):
         self.alpha = float(alpha)
         self.beta = float(beta)
         self.model = None
         self.active_features = []
+        self.n_componentes_optimo = 11
 
     def obtener_canales_validos(self, columns: list) -> list:
         """
-        Selecciona y filtra los canales de longitud de onda válidos, descartando
-        regiones ruidosas y de fuerte absorción/saturación por agua:
+        Selecciona y filtra los canales de longitud de onda válidos:
         - Extremos: < 500 nm
         - Crossover del detector: 1090-1110 nm
         - Absorción de agua fuerte: 1800-2100 nm y > 2300 nm
@@ -161,58 +162,59 @@ class ModeloPLSRegresionNIR:
         for col in columns:
             try:
                 w = float(col)
-                if w < 500.0:
-                    continue
-                if 1090.0 <= w <= 1110.0:
-                    continue
-                if 1800.0 <= w <= 2100.0:
-                    continue
-                if w > 2300.0:
+                if w < 500.0 or (1090.0 <= w <= 1110.0) or (1800.0 <= w <= 2100.0) or w > 2300.0:
                     continue
                 valid_cols.append(col)
             except ValueError:
                 continue
         return valid_cols
 
-    def entrenar_calibracion(self, X_df: pd.DataFrame, y_series: pd.Series, n_componentes: int = 11, downweight: bool = True):
+    def entrenar_calibracion(self, X_df: pd.DataFrame, y_series: pd.Series, max_componentes: int = 20):
         """
-        Entrena el modelo PLS-R seleccionando las bandas espectrales válidas.
-        Alinea el modelo usando scikit-learn.
+        Entrena el modelo PLS-R seleccionando las bandas espectrales válidas y
+        realizando validación cruzada para optimizar el número de componentes.
         """
-        self.n_componentes = int(n_componentes)
         self.active_features = self.obtener_canales_validos(X_df.columns.tolist())
         
         if not self.active_features:
-            raise ValueError("No se encontraron canales de longitud de onda válidos en el DataFrame proporcionado.")
+            raise ValueError("No se encontraron canales de longitud de onda válidos.")
             
         X_filtered = X_df[self.active_features].copy()
         
-        # Crear y ajustar el regresor PLS
-        self.model = PLSRegression(n_components=self.n_componentes, scale=True)
+        # Selección óptima de LVs usando validación cruzada
+        best_score = -np.inf
+        
+        for k in range(1, max_componentes + 1):
+            pls = PLSRegression(n_components=k, scale=True)
+            # Usar r2 score para evaluación de CV
+            scores = cross_val_score(pls, X_filtered, y_series, cv=5)
+            mean_score = np.mean(scores)
+            
+            if mean_score > best_score:
+                best_score = mean_score
+                self.n_componentes_optimo = k
+        
+        # Entrenar modelo final con LVs óptimos
+        self.model = PLSRegression(n_components=self.n_componentes_optimo, scale=True)
         self.model.fit(X_filtered, y_series)
 
     def predecir(self, X_df: pd.DataFrame, alpha: float = None, beta: float = None) -> np.ndarray:
         """
         Predice concentraciones utilizando el modelo PLS-R entrenado sobre
-        las bandas espectrales activas. Permite sobreescribir alpha/beta.
+        las bandas espectrales activas.
         """
         if self.model is None:
             raise ValueError("El modelo PLS-R no ha sido entrenado aún.")
             
-        # Reindexar o filtrar según las características activas durante el entrenamiento
-        missing_features = [f for f in self.active_features if f not in X_df.columns]
-        if missing_features:
-            X_filtered = X_df.reindex(columns=self.active_features, fill_value=0.0)
-        else:
-            X_filtered = X_df[self.active_features].copy()
-            
+        X_filtered = X_df.reindex(columns=self.active_features, fill_value=0.0)
+        
         C_pred = self.model.predict(X_filtered).flatten()
         
         alpha_val = alpha if alpha is not None else self.alpha
         beta_val = beta if beta is not None else self.beta
         
-        C_final = (C_pred * alpha_val) + beta_val
-        return np.maximum(0.0, C_final)
+        return np.maximum(0.0, (C_pred * alpha_val) + beta_val)
+
 
     def evaluar_clasificacion_fisiologica(self, concentracion_mM: float) -> str:
         """Clasifica la concentración en rangos metabólicos clínicos, consistente con el modelo univariante."""

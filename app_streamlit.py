@@ -333,17 +333,26 @@ with tab4:
     st.markdown("---")
     st.subheader("Procesamiento por Lotes")
     
-    with st.expander("ℹ️ Guía de formato para el archivo CSV y parámetros de análisis", expanded=False):
+    with st.expander("ℹ️ Guía de formato y Fundamentos Teóricos", expanded=False):
         st.markdown(rf"""
         **Condiciones de Análisis Activas:**
         * Los datos del archivo se evalúan en tiempo real con la **Longitud de onda ($\lambda = {lambda_nm}\text{{ nm}}$)** y el **Camino óptico ($L = {L_mm}\text{{ mm}}$)** configurados en la barra lateral (*sidebar*).
         
-        **Estructura y Unidades Requeridas en el CSV/Parquet:**
-        * **Columna de absorbancia (Obligatoria):** Encabezados válidos: `absorbancia_1600nm`, `absorbancia_1650nm`, `absorbancia`, o `A`. Valores en **u.a.** (unidades de absorbancia neta).
-        * **Columna de referencia (Opcional):** Encabezados válidos: `glucosa_referencia_mM`, `Glucosa_Real_mM`, `glucosa_mM` o `C_real`. Valores en **mM** (milimolar) para el cálculo del *Error Relativo (%)*.
-        * **Identificador (Opcional):** `id_muestra` (alfanumérico).
+        **Flujo de Procesamiento Espectral (Multivariante):**
+        1. **Pre-procesamiento:** Filtrado de 2956 canales para eliminar regiones ruidosas (<500nm, crossover 1090-1110nm, absorción de agua 1800-2100nm, >2300nm).
+        2. **Calibración:** Entrenamiento PLS-R con selección automática de componentes latentes (CV-5fold).
+        3. **Inferencia:** Cálculo de concentración mediante regresión sobre vectores de carga optimizados.
+        
+        **Formulación Matemática (PLS-R):**
+        * **Descomposición:** $X = T P^T + E$, $y = T q + f$
+        * **Regresión:** $b_{PLS} = W (P^T W)^{-1} q$
+        * **Predicción:** $C_{pred} = b_0 + X_{valid} b_{PLS}$
+        * **Ajuste:** $C_{final} = \alpha \cdot C_{pred} + \beta$
 
-        ⚠️ **Nota sobre el Error Relativo (%):** Este valor muestra la desviación porcentual de la estimación respecto a la referencia experimental ( |Estimación - Referencia| / Referencia * 100 ). Valores elevados sugieren discrepancias entre el modelo físico teórico y los datos medidos; úselo para identificar muestras o rangos de concentración donde el modelo requiere ajuste.
+        **Estructura Requerida en el CSV/Parquet:**
+        * **Columna de absorbancia (Legacy):** `absorbancia`, `A`, etc.
+        * **Matriz Espectral (Multivariante):** Columnas con encabezados numéricos (ej. `1000.5`, `1001.0`).
+        * **Columna de referencia (Opcional):** `Glucosa_Real_mM` (para métricas RMSEP).
         """)
 
     uploaded = st.file_uploader("Subir archivo de muestras (CSV, Parquet)", type=["csv", "parquet"])
@@ -386,19 +395,23 @@ with tab4:
             if len(espectro_cols) > 100: # Heurística para detectar matriz espectral
                 estado_texto.text("Procesando con modelo multivariante PLS-R...")
                 
-                # Instanciar y cargar modelo PLS (esto debería entrenarse o cargarse de disco)
-                # Como no tengo el modelo entrenado, instancio y entreno con el mismo lote para demostración
-                pls_model = ModeloPLSRegresionNIR(n_componentes=11, alpha=alpha, beta=beta)
+                # Instanciar modelo PLS
+                pls_model = ModeloPLSRegresionNIR(alpha=alpha, beta=beta)
                 
-                # Intentar buscar columna de referencia para entrenar/evaluar
+                # Intentar buscar columna de referencia
                 candidatos_ref = ['Glucose (mM)', 'glucosa_referencia_mM', 'Glucosa_Real_mM', 'glucosa_mM', 'glucose_mM', 'C_real']
                 col_ref = next((c for c in candidatos_ref if c in df_lote.columns), None)
                 
                 if col_ref:
-                    # Entrenamiento rápido (en un entorno real esto se haría offline)
+                    # Entrenamiento y predicción
                     y_series = pd.to_numeric(df_lote[col_ref], errors="coerce").fillna(0)
                     pls_model.entrenar_calibracion(df_lote, y_series)
                     df_lote["Glucosa_Estimada_mM"] = pls_model.predecir(df_lote, alpha=alpha, beta=beta)
+                    
+                    # Cálculo de RMSEP
+                    mse = np.mean((df_lote["Glucosa_Estimada_mM"] - y_series)**2)
+                    rmse = np.sqrt(mse)
+                    st.write(f"**Métricas PLS-R:** RMSEP = {rmse:.4f} mM, Componentes óptimos = {pls_model.n_componentes_optimo}")
                 else:
                     st.error("No se encontró columna de referencia para calibración del modelo PLS-R.")
             

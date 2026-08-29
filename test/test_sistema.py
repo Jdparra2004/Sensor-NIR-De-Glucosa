@@ -15,10 +15,10 @@ import sys
 # Asegurar importación del directorio raíz del proyecto
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from core.modelo_optico import ModeloBeerLambertNIR, LAMBDA_REFERENCIA_NM, DELTA_W
+from core.modelo_optico import ModeloBeerLambertNIR, ModeloPLSRegresionNIR, LAMBDA_REFERENCIA_NM, DELTA_W
 from core.modelo_microfluido import ModeloMicrofluido
 from core.simulacion_parametrica import SimulacionParametrica
-
+from sklearn.cross_decomposition import PLSRegression
 
 class TestSensorNIR(unittest.TestCase):
 
@@ -26,11 +26,40 @@ class TestSensorNIR(unittest.TestCase):
         """Configuración de entorno aislado antes de cada prueba."""
         self.test_dir = tempfile.mkdtemp()
         self.modelo_optico = ModeloBeerLambertNIR(longitud_optica_mm=1.0, incluir_desplazamiento_agua=True)
+        self.modelo_plsr = ModeloPLSRegresionNIR()
         self.modelo_mf = ModeloMicrofluido(ancho_um=200.0, alto_um=50.0, largo_mm=5.0, caudal_nL_min=5.0)
 
     def tearDown(self):
         """Limpieza del entorno temporal tras cada prueba."""
         shutil.rmtree(self.test_dir, ignore_errors=True)
+
+    # --- NUEVAS PRUEBAS PARA PLS-R ---
+
+    def test_plsr_channel_masking(self):
+        """Verifica que el filtrado de canales sea correcto."""
+        # Generar datos simulados con encabezados de longitud de onda
+        cols = ["400.0", "600.0", "1100.0", "1600.0", "1900.0", "2400.0"]
+        # Canales esperados: 600.0, 1600.0
+        # 400 < 500 (descartar), 1100 (crossover 1090-1110 descartar), 1900 (agua 1800-2100 descartar), 2400 (> 2300 descartar)
+        
+        valid_cols = self.modelo_plsr.obtener_canales_validos(cols)
+        self.assertEqual(valid_cols, ["600.0", "1600.0"])
+
+    def test_plsr_training_and_prediction(self):
+        """Verifica el entrenamiento y predicción del modelo PLSR."""
+        # Crear datos de entrenamiento (X espectral, y concentración)
+        X = pd.DataFrame(np.random.rand(20, 100), columns=[str(500.0 + i*10) for i in range(100)])
+        y = pd.Series(np.random.rand(20))
+        
+        self.modelo_plsr.entrenar_calibracion(X, y, max_componentes=5)
+        
+        # Predecir sobre datos de prueba
+        X_test = pd.DataFrame(np.random.rand(5, 100), columns=X.columns)
+        predictions = self.modelo_plsr.predecir(X_test)
+        
+        self.assertEqual(len(predictions), 5)
+        self.assertTrue(np.all(predictions >= 0))
+
 
     def test_absorbancia_computo(self):
         """Verifica que el cálculo de absorbancia retorne un valor numérico válido."""
