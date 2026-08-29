@@ -360,7 +360,10 @@ with tab4:
             else:
                 try:
                     uploaded.seek(0)
-                    df_lote = pd.read_csv(uploaded)
+                    df_lote = pd.read_csv(uploaded, encoding='utf-8')
+                except UnicodeDecodeError:
+                    uploaded.seek(0)
+                    df_lote = pd.read_csv(uploaded, sep=None, engine="python", encoding='utf-16')
                 except Exception:
                     uploaded.seek(0)
                     df_lote = pd.read_csv(uploaded, sep=None, engine="python")

@@ -30,8 +30,10 @@ def preparar_datos_chunked():
         # Para las absorbancias, tomaremos las columnas 9 en adelante
         
         # Filtramos y renombramos
-        df_chunk = chunk.iloc[:, [0, 2, 5]].copy()
-        df_chunk.columns = ['glucosa_referencia_mM', 'lactato_mM', 'temperatura_C']
+        # Columnas: 0 (glucosa), 2 (lactato), 5 (temperatura), 609 (absorbancia 1600nm aprox), 659 (absorbancia 1650nm aprox)
+        # Ajuste de índices basado en que empiezan en 9.
+        df_chunk = chunk.iloc[:, [0, 2, 5, 609, 659]].copy()
+        df_chunk.columns = ['glucosa_referencia_mM', 'lactato_mM', 'temperatura_C', 'absorbancia_1600nm', 'absorbancia_1650nm']
         
         # Nota: Aquí no estamos incluyendo todas las absorbancias por simplicidad y memoria.
         # Si las necesitas, tendrías que seleccionar más columnas numéricas.
