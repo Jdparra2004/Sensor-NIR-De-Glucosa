@@ -316,8 +316,8 @@ with tab3:
     col2.plotly_chart(fig6)
     
     with st.container(border=True):
-        st.latex(r"\text{Sensibilidad} = \frac{\partial A}{\partial C} = \left(\epsilon_g(\lambda) - \epsilon_w(\lambda) \cdot \delta_w\right) \cdot L")
-        st.info("La sensibilidad aumenta linealmente con el camino óptico L, permitiendo amplificar la señal neta sin afectar la selectividad del desplazamiento del solvente.")
+        st.latex(r"\text{Sensibilidad (física)} = \frac{\partial A}{\partial C} = \left(\epsilon_g(\lambda) - \epsilon_w(\lambda) \cdot \delta_w\right) \cdot L")
+        st.info("Nota: Esta es la sensibilidad teórica del modelo físico Beer-Lambert. El modelo PLS-R multivariante utiliza un vector de pesos ($b_{PLS}$) entrenado sobre todo el espectro para maximizar la covarianza entre la absorbancia y la concentración.")
 
 # Tab 4: Inferencia
 with tab4:
