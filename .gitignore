@@ -24,3 +24,8 @@ data/
 *.csv
 *.xlsx
 *.txt
+
+#streamlit
+# Streamlit AI Skills
+.agents/
+.claude/

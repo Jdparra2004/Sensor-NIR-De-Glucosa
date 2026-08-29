@@ -188,6 +188,9 @@ tab1, tab2, tab3, tab4 = st.tabs(["Óptica NIR", "Microfluídica", "Sensibilidad
 
 # Tab 1: Óptica
 with tab1:
+    with st.expander("Información del Análisis", expanded=False):
+        st.markdown("Este módulo caracteriza la respuesta óptica del biosensor basándose en la Ley de Beer-Lambert. Calcula la absorbancia neta considerando el fenómeno de desplazamiento de agua, permitiendo visualizar la relación entre la concentración de glucosa y la absorbancia, así como el perfil espectral en la ventana de detección seleccionada.")
+    
     c_range = np.linspace(0.01, 1.0, 100)
     abs_vals = [aplicar_ruido(modelo_optico.absorbancia(c, lambda_nm)) for c in c_range]
     
@@ -229,6 +232,9 @@ with tab1:
 
 # Tab 2: Microfluídica
 with tab2:
+    with st.expander("Información del Análisis", expanded=False):
+        st.markdown("Este módulo evalúa las propiedades hidrodinámicas del fluido dentro del canal microfluídico. Calcula parámetros críticos para el diseño, incluyendo el número de Reynolds para verificar la laminaridad del flujo y el tiempo de residencia para determinar la interacción óptima fluido-sensor.")
+    
     Q_range = np.linspace(1.0, 10.0, 50)
     Re_vals = [ModeloMicrofluido(w_um, h_um, largo_mm, q).numero_reynolds() for q in Q_range]
     tr_vals = [ModeloMicrofluido(w_um, h_um, largo_mm, q).tiempo_residencia_s() for q in Q_range]
@@ -271,6 +277,9 @@ with tab2:
 
 # Tab 3: Sensibilidad
 with tab3:
+    with st.expander("Información del Análisis", expanded=False):
+        st.markdown("Este estudio analiza cómo la longitud del camino óptico afecta la sensibilidad local (dA/dC) del biosensor. El objetivo es identificar configuraciones geométricas que maximicen la señal de detección sin degradar la selectividad del sistema.")
+    
     L_range = np.linspace(0.1, 2.0, 50)
     sens_vals = [ModeloBeerLambertNIR(L).sensibilidad(lambda_nm) for L in L_range]
     abs_vals_L = [ModeloBeerLambertNIR(L).absorbancia(c_sim, lambda_nm) for L in L_range]
@@ -306,6 +315,9 @@ with tab3:
 
 # Tab 4: Inferencia
 with tab4:
+    with st.expander("Información del Análisis", expanded=False):
+        st.markdown("Motor de inferencia para la estimación de concentración de glucosa a partir de valores de absorbancia. Permite el análisis puntual o el procesamiento de lotes mediante carga de archivos CSV, clasificando las muestras según umbrales metabólicos fisiológicos.")
+
     st.subheader("Inferencia Clínica")
     A_med = st.number_input("Absorbancia medida (A)", value=-0.05, step=0.001, format="%.5f")
     if st.button("Estimar"):
