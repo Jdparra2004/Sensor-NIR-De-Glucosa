@@ -34,7 +34,26 @@ $$
 
 ---
 
-## 🛠️ Instalación y Uso
+## 🏗️ Arquitectura del Proyecto
+
+El proyecto está diseñado bajo un paradigma modular para separar la lógica de simulación, las pruebas y la interfaz.
+
+### Estructura de Módulos
+- `core/`: Contiene los modelos físicos fundamentales.
+  - `modelo_optico.py`: Implementación de la Ley de Beer-Lambert modificada.
+  - `modelo_microfluido.py`: Cálculos de dinámica de fluidos (Re, Pe, flujo).
+  - `simulacion_parametrica.py`: Motor principal que orquesta la ejecución de simulaciones variando parámetros físicos.
+- `test/`: Suite de validación para asegurar la integridad de los modelos y simulaciones.
+- `utils/`: Módulos auxiliares para procesamiento de datos y visualización.
+
+### Flujo de Dependencias
+El sistema sigue una dirección de flujo clara para mantener la coherencia y facilitar las pruebas:
+`Tests (test/)` → `Motor de Simulación (core/simulacion_parametrica.py)` → `Modelos Nucleares (core/modelo_optico.py, core/modelo_microfluido.py)`
+
+Esta separación asegura que los cambios en los modelos nucleares sean automáticamente validados por las pruebas y reflejados en el motor de simulación.
+
+---
+
 
 ### Requisitos previos
 
