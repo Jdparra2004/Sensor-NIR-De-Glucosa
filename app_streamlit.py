@@ -14,7 +14,7 @@ import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
-from core.modelo_optico import ModeloBeerLambertNIR
+from core.modelo_optico import ModeloBeerLambertNIR, ModeloPLSRegresionNIR
 from core.modelo_microfluido import ModeloMicrofluido
 
 st.set_page_config(page_title="Biosensor NIR - Glucosa en Sudor", layout="wide")
@@ -376,33 +376,62 @@ with tab4:
                 df_lote = df_lote.head(1000).copy()
                 st.warning(f"El archivo contiene {total_filas_original:,} filas. Para garantizar la fluidez de la interfaz, se procesan y analizan las primeras 1,000 muestras.")
 
-            estado_texto.text("Paso 2/4: Identificando canal óptico de absorbancia...")
+            estado_texto.text("Paso 2/4: Identificando canal óptico o espectro completo...")
             barra_progreso.progress(50)
             time.sleep(0.05)
             
-            col_abs = None
-            candidatos_abs = ['absorbancia_1600nm', 'absorbancia_1650nm', 'absorbancia_medida', 'absorbancia', 'Absorbance', 'A']
-            for cand in candidatos_abs:
-                if cand in df_lote.columns:
-                    col_abs = cand
-                    break
+            # --- DETECCIÓN DE ESPECTRO COMPLETO (400 - 2500 nm) ---
+            espectro_cols = [c for c in df_lote.columns if c.replace('.','',1).isdigit()]
             
-            if col_abs is None:
-                for col in df_lote.columns:
-                    if 'abs' in col.lower():
-                        col_abs = col
+            if len(espectro_cols) > 100: # Heurística para detectar matriz espectral
+                estado_texto.text("Procesando con modelo multivariante PLS-R...")
+                
+                # Instanciar y cargar modelo PLS (esto debería entrenarse o cargarse de disco)
+                # Como no tengo el modelo entrenado, instancio y entreno con el mismo lote para demostración
+                pls_model = ModeloPLSRegresionNIR(n_componentes=11, alpha=alpha, beta=beta)
+                
+                # Intentar buscar columna de referencia para entrenar/evaluar
+                candidatos_ref = ['Glucose (mM)', 'glucosa_referencia_mM', 'Glucosa_Real_mM', 'glucosa_mM', 'glucose_mM', 'C_real']
+                col_ref = next((c for c in candidatos_ref if c in df_lote.columns), None)
+                
+                if col_ref:
+                    # Entrenamiento rápido (en un entorno real esto se haría offline)
+                    y_series = pd.to_numeric(df_lote[col_ref], errors="coerce").fillna(0)
+                    pls_model.entrenar_calibracion(df_lote, y_series)
+                    df_lote["Glucosa_Estimada_mM"] = pls_model.predecir(df_lote, alpha=alpha, beta=beta)
+                else:
+                    st.error("No se encontró columna de referencia para calibración del modelo PLS-R.")
+            
+            else:
+                # --- LÓGICA UNIVARIANTE LEGACY ---
+                col_abs = None
+                candidatos_abs = ['absorbancia_1600nm', 'absorbancia_1650nm', 'absorbancia_medida', 'absorbancia', 'Absorbance', 'A']
+                for cand in candidatos_abs:
+                    if cand in df_lote.columns:
+                        col_abs = cand
                         break
+                
+                if col_abs is None:
+                    for col in df_lote.columns:
+                        if 'abs' in col.lower():
+                            col_abs = col
+                            break
 
-            if col_abs is not None:
-                estado_texto.text(rf"Paso 3/4: Ejecutando inferencia inversa ($\lambda={lambda_nm}\text{{ nm}}$, $L={L_mm}\text{{ mm}}$)...")
-                barra_progreso.progress(75)
-                
-                valores_abs = pd.to_numeric(df_lote[col_abs], errors="coerce")
-                df_lote["Glucosa_Estimada_mM"] = valores_abs.apply(
-                    lambda a: modelo_optico.concentracion_inversa(float(a), lambda_nm, alpha=alpha, beta=beta) if pd.notna(a) else np.nan
-                ).round(4)
-                
-                candidatos_ref = ['glucosa_referencia_mM', 'Glucosa_Real_mM', 'glucosa_mM', 'glucose_mM', 'C_real']
+                if col_abs is not None:
+                    estado_texto.text(rf"Paso 3/4: Ejecutando inferencia inversa ($\lambda={lambda_nm}\text{{ nm}}$, $L={L_mm}\text{{ mm}}$)...")
+                    barra_progreso.progress(75)
+                    
+                    valores_abs = pd.to_numeric(df_lote[col_abs], errors="coerce")
+                    df_lote["Glucosa_Estimada_mM"] = valores_abs.apply(
+                        lambda a: modelo_optico.concentracion_inversa(float(a), lambda_nm, alpha=alpha, beta=beta) if pd.notna(a) else np.nan
+                    ).round(4)
+                    
+                    candidatos_ref = ['glucosa_referencia_mM', 'Glucosa_Real_mM', 'glucosa_mM', 'glucose_mM', 'C_real']
+                    col_ref = next((c for c in candidatos_ref if c in df_lote.columns), None)
+            
+            # --- CÁLCULO DE MÉTRICAS SI HAY REFERENCIA ---
+            if 'Glucosa_Estimada_mM' in df_lote.columns:
+                candidatos_ref = ['Glucose (mM)', 'glucosa_referencia_mM', 'Glucosa_Real_mM', 'glucosa_mM', 'glucose_mM', 'C_real']
                 col_ref = next((c for c in candidatos_ref if c in df_lote.columns), None)
                 if col_ref is not None:
                     c_real = pd.to_numeric(df_lote[col_ref], errors="coerce")

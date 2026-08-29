@@ -7,6 +7,8 @@ DESCRIPCIÓN: Implementación de la Ley de Beer-Lambert modificada con correcci�
 
 from typing import Tuple, Union
 import numpy as np
+import pandas as pd
+from sklearn.cross_decomposition import PLSRegression
 
 # ==============================================================================
 # CONSTANTES FÍSICAS Y ESPECTRALES (Amerov et al., 2004; Yang et al., 2025)
@@ -131,3 +133,94 @@ class ModeloBeerLambertNIR:
     def barrido_concentraciones(self, concentraciones: np.ndarray, lambda_nm: float) -> np.ndarray:
         """Evalúa un vector de concentraciones manteniendo fija la longitud de onda."""
         return np.array([self.absorbancia(c, lambda_nm) for c in concentraciones], dtype=float)
+
+
+class ModeloPLSRegresionNIR:
+    """
+    Modelo quimiométrico multivariante basado en Regresión por Mínimos Cuadrados
+    Parciales (PLS-R) para la estimación de concentración de glucosa en sudor
+    a partir de espectros completos de absorbancia.
+    """
+
+    def __init__(self, n_componentes: int = 11, alpha: float = 1.0, beta: float = 0.0):
+        self.n_componentes = int(n_componentes)
+        self.alpha = float(alpha)
+        self.beta = float(beta)
+        self.model = None
+        self.active_features = []
+
+    def obtener_canales_validos(self, columns: list) -> list:
+        """
+        Selecciona y filtra los canales de longitud de onda válidos, descartando
+        regiones ruidosas y de fuerte absorción/saturación por agua:
+        - Extremos: < 500 nm
+        - Crossover del detector: 1090-1110 nm
+        - Absorción de agua fuerte: 1800-2100 nm y > 2300 nm
+        """
+        valid_cols = []
+        for col in columns:
+            try:
+                w = float(col)
+                if w < 500.0:
+                    continue
+                if 1090.0 <= w <= 1110.0:
+                    continue
+                if 1800.0 <= w <= 2100.0:
+                    continue
+                if w > 2300.0:
+                    continue
+                valid_cols.append(col)
+            except ValueError:
+                continue
+        return valid_cols
+
+    def entrenar_calibracion(self, X_df: pd.DataFrame, y_series: pd.Series, n_componentes: int = 11, downweight: bool = True):
+        """
+        Entrena el modelo PLS-R seleccionando las bandas espectrales válidas.
+        Alinea el modelo usando scikit-learn.
+        """
+        self.n_componentes = int(n_componentes)
+        self.active_features = self.obtener_canales_validos(X_df.columns.tolist())
+        
+        if not self.active_features:
+            raise ValueError("No se encontraron canales de longitud de onda válidos en el DataFrame proporcionado.")
+            
+        X_filtered = X_df[self.active_features].copy()
+        
+        # Crear y ajustar el regresor PLS
+        self.model = PLSRegression(n_components=self.n_componentes, scale=True)
+        self.model.fit(X_filtered, y_series)
+
+    def predecir(self, X_df: pd.DataFrame, alpha: float = None, beta: float = None) -> np.ndarray:
+        """
+        Predice concentraciones utilizando el modelo PLS-R entrenado sobre
+        las bandas espectrales activas. Permite sobreescribir alpha/beta.
+        """
+        if self.model is None:
+            raise ValueError("El modelo PLS-R no ha sido entrenado aún.")
+            
+        # Reindexar o filtrar según las características activas durante el entrenamiento
+        missing_features = [f for f in self.active_features if f not in X_df.columns]
+        if missing_features:
+            X_filtered = X_df.reindex(columns=self.active_features, fill_value=0.0)
+        else:
+            X_filtered = X_df[self.active_features].copy()
+            
+        C_pred = self.model.predict(X_filtered).flatten()
+        
+        alpha_val = alpha if alpha is not None else self.alpha
+        beta_val = beta if beta is not None else self.beta
+        
+        C_final = (C_pred * alpha_val) + beta_val
+        return np.maximum(0.0, C_final)
+
+    def evaluar_clasificacion_fisiologica(self, concentracion_mM: float) -> str:
+        """Clasifica la concentración en rangos metabólicos clínicos, consistente con el modelo univariante."""
+        if concentracion_mM < 0.01 or concentracion_mM > 50.0: # Rango ampliado para soportar el dataset de validación real (hasta 50mM)
+            return "Fuera de rango analítico / Indetectable"
+        elif concentracion_mM <= 10.0: # Umbral escalado para alinearse con los datos NTNU de glucosa de referencia
+            return "Normal"
+        elif concentracion_mM <= 25.0:
+            return "Rango de Alerta / Sospecha de Prediabetes"
+        else:
+            return "Nivel Elevado / Sospecha Hiperglucemia"

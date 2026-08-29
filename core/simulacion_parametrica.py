@@ -24,7 +24,7 @@ import pandas as pd
 from pathlib import Path
 import json
 
-from core.modelo_optico import ModeloBeerLambertNIR, LAMBDA_REFERENCIA_NM
+from core.modelo_optico import ModeloBeerLambertNIR, ModeloPLSRegresionNIR, LAMBDA_REFERENCIA_NM
 from core.modelo_microfluido import ModeloMicrofluido
 
 # CONFIGURACIÓN DE SIMULACIÓN POR DEFECTO
@@ -307,3 +307,26 @@ class SimulacionParametrica:
 
         print(f"\n✓ {len(self.resultados)} simulaciones completadas.\n")
         return self.resultados
+
+    def sim_validacion_plsr(self, X_train, y_train, X_test, y_test):
+        """
+        Realiza validación del modelo PLS-R y computa RMSEP y Error Relativo.
+        """
+        modelo = ModeloPLSRegresionNIR(n_componentes=11)
+        modelo.entrenar_calibracion(X_train, y_train)
+        
+        y_pred = modelo.predecir(X_test)
+        
+        # RMSEP
+        mse = np.mean((y_pred - y_test)**2)
+        rmsep = np.sqrt(mse)
+        
+        # Error Relativo
+        error_relativo = np.mean(np.abs(y_pred - y_test) / np.where(y_test != 0, y_test, 1e-12)) * 100
+        
+        return {
+            "modelo": modelo,
+            "RMSEP": rmsep,
+            "Error_Relativo_pct": error_relativo
+        }
+
