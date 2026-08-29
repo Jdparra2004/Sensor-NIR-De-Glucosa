@@ -54,8 +54,10 @@ class ModeloBeerLambertNIR:
     acoplado con corrección por exclusión volumétrica de solvente.
     """
 
-    def __init__(self, longitud_optica_mm: float = 1.0, incluir_desplazamiento_agua: bool = True):
+    def __init__(self, longitud_optica_mm: float = 1.0, alpha: float = 1.0, beta: float = 0.0, incluir_desplazamiento_agua: bool = True):
         self.longitud_optica_mm = float(longitud_optica_mm)
+        self.alpha = float(alpha)
+        self.beta = float(beta)
         self.incluir_desplazamiento_agua = bool(incluir_desplazamiento_agua)
 
     @property
@@ -88,15 +90,16 @@ class ModeloBeerLambertNIR:
     def concentracion_inversa(self, absorbancia: float, lambda_nm: float) -> float:
         """
         Calcula la concentración molar C (mM) a partir de la absorbancia A_neta.
-        Maneja magnitudes absolutas para preservar la robustez analítica ante absorbancias negativas.
+        Aplica calibración empírica: C_final = (C_teórica * alpha) + beta.
         """
         L = self.longitud_optica_mm
         eps_net = self.obtener_coeficiente_neto(lambda_nm)
         
         if np.isclose(eps_net, 0.0) or np.isclose(L, 0.0):
-            return 0.0
+            return 0.0 + self.beta
         
-        return float(abs(absorbancia) / (abs(eps_net) * L))
+        c_teorica = float(abs(absorbancia) / (abs(eps_net) * L))
+        return (c_teorica * self.alpha) + self.beta
 
     def evaluar_clasificacion_fisiologica(self, concentracion_mM: float) -> str:
         """Clasifica la concentración de glucosa en sudor en rangos metabólicos clínicos."""

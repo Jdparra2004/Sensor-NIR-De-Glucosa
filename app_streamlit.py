@@ -76,8 +76,12 @@ w_um = st.sidebar.slider("Ancho del canal (w) [µm]", 50, 500, 200, 10)
 h_um = st.sidebar.slider("Alto del canal (h) [µm]", 10, 200, 50, 10)
 largo_mm = st.sidebar.slider("Largo de celda [mm]", 0.5, 5.0, 1.0, 0.5)
 
+st.sidebar.subheader("Calibración Empírica")
+alpha = st.sidebar.slider("Factor de escala (α)", 0.0, 1000.0, 1.0, 0.1)
+beta = st.sidebar.slider("Sesgo (β)", -100.0, 100.0, 0.0, 0.1)
+
 # --- MODELOS ---
-modelo_optico = ModeloBeerLambertNIR(longitud_optica_mm=L_mm)
+modelo_optico = ModeloBeerLambertNIR(longitud_optica_mm=L_mm, alpha=alpha, beta=beta)
 modelo_micro = ModeloMicrofluido(w_um, h_um, largo_mm, Q_nlmin)
 
 def aplicar_ruido(valor):
