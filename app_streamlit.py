@@ -27,8 +27,42 @@ LEYENDA_INFERIOR = dict(
     x=0.5
 )
 
+# --- ESTADO DE LA SESIÓN PARA PANTALLA DE BIENVENIDA ---
+if 'show_info' not in st.session_state:
+    st.session_state.show_info = True
+
+def display_welcome_info():
+    """Muestra la ventana de bienvenida con información del proyecto y disclaimer."""
+    st.info("### Bienvenido al Biosensor NIR: Simulador Paramétrico")
+    st.markdown("""
+    Esta aplicación es una **herramienta de simulación numérica** diseñada para explorar los parámetros de diseño en sistemas de detección óptica de glucosa en sudor mediante espectroscopia NIR.
+
+    **¿Qué puedes hacer aquí?**
+    *   **Simulación Óptica:** Ajustar la longitud de onda y el camino óptico para analizar la absorbancia neta.
+    *   **Análisis Microfluídico:** Evaluar el régimen de flujo (Reynolds) y el tiempo de residencia.
+    *   **Sensibilidad:** Analizar cómo los cambios geométricos afectan la capacidad de detección.
+    *   **Inferencia Clínica:** Procesar lotes de datos para estimar concentraciones de glucosa y clasificar resultados metabólicos.
+
+    **IMPORTANTE - DISCLAIMER DE DISEÑO:**
+    Este software es exclusivamente una **herramienta de simulación para diseño y exploración de parámetros**. 
+    **NO** es un dispositivo médico, ni proporciona resultados clínicos, diagnósticos ni decisiones técnicas finales. Los resultados son proyecciones basadas en modelos teóricos (física-matemática) y deben utilizarse únicamente para evaluar la viabilidad de parámetros de diseño durante la fase de desarrollo.
+    """)
+    if st.button("Entendido y cerrar"):
+        st.session_state.show_info = False
+        st.rerun()
+
+# Si debe mostrarse la información, la mostramos
+if st.session_state.show_info:
+    display_welcome_info()
+    st.stop() # Detenemos ejecución para que solo se vea la info
+
 # --- SIDEBAR ---
 st.sidebar.header("Parámetros de Diseño y Simulación")
+
+if st.sidebar.button("Ver Guía y Disclaimer"):
+    st.session_state.show_info = True
+    st.rerun()
+
 st.sidebar.subheader("Óptica NIR")
 lambda_nm = st.sidebar.slider("Longitud de onda (λ) [nm]", 1000, 1700, 1600, 1)
 L_mm = st.sidebar.slider("Camino óptico (L) [mm]", 0.1, 2.0, 1.0, 0.1)
