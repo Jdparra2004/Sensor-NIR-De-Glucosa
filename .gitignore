@@ -29,3 +29,7 @@ data/
 # Streamlit AI Skills
 .agents/
 .claude/
+
+#Acceso de agentes de streamlit
+GEMINI.md
+watch_graph.py
