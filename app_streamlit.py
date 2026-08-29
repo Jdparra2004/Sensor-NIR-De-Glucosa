@@ -227,7 +227,7 @@ with tab1:
     col2.plotly_chart(fig2)
 
     with st.container(border=True):
-        st.latex(r"C_{\text{final}} = \alpha \cdot \left( \frac{|A_{\text{neta}}|}{|\epsilon_{\text{net}}(\lambda)| \cdot L} \right) + \beta")
+        st.latex(r"C_{\text{final}} = \alpha \cdot \left( \frac{|A_{\text{neta}}|}{|\epsilon_{\text{g}}(\lambda) - \epsilon_{\text{w}}(\lambda) \cdot \delta_{\text{w}}| \cdot L} \right) + \beta")
         A_actual = modelo_optico.absorbancia(c_sim, lambda_nm)
         st.info(
             rf"Configuración: $\lambda = {lambda_nm}\text{{ nm}}$, $L = {L_mm}\text{{ mm}}$, "
@@ -345,9 +345,9 @@ with tab4:
         
         **Formulación Matemática (PLS-R):**
         * **Descomposición:** $X = T P^T + E$, $y = T q + f$
-        * **Regresión:** $b_{PLS} = W (P^T W)^{-1} q$
-        * **Predicción:** $C_{pred} = b_0 + X_{valid} b_{PLS}$
-        * **Ajuste:** $C_{final} = \alpha \cdot C_{pred} + \beta$
+        * **Regresión:** $b_{{PLS}} = W (P^T W)^{{-1}} q$
+        * **Predicción:** $C_{{pred}} = b_0 + X_{{valid}} b_{{PLS}}$
+        * **Ajuste:** $C_{{final}} = \alpha \cdot C_{{pred}} + \beta$
 
         **Estructura Requerida en el CSV/Parquet:**
         * **Columna de absorbancia (Legacy):** `absorbancia`, `A`, etc.
