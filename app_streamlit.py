@@ -355,7 +355,7 @@ with tab4:
         * **Columna de referencia (Opcional):** `Glucosa_Real_mM` (para métricas RMSEP).
         """)
 
-    uploaded = st.file_uploader("Subir archivo de muestras (CSV, Parquet)", type=["csv", "parquet"])
+    uploaded = st.file_uploader("Subir archivo de muestras (CSV, Parquet, TXT)", type=["csv", "parquet", "txt"])
     
     if uploaded is not None:
         progreso_contenedor = st.container()
@@ -371,6 +371,8 @@ with tab4:
             
             if file_ext == '.parquet':
                 df_lote = pd.read_parquet(uploaded)
+            elif file_ext == '.txt':
+                df_lote = pd.read_csv(uploaded, sep='\t', encoding='utf-16')
             else:
                 try:
                     uploaded.seek(0)
