@@ -79,7 +79,12 @@ pip install -r requirements.txt
 streamlit run app_streamlit.py
 ```
 
-#### Opción 2: Línea de comandos (Análisis técnico)
+#### Opción 2: Validación Estadística Reproducible (Un solo clic)
+```bash
+python validacion_reproducible.py
+```
+
+#### Opción 3: Línea de comandos (Análisis técnico)
 ```bash
 # Ejecutar simulaciones y mostrar resultados
 python main.py --consola

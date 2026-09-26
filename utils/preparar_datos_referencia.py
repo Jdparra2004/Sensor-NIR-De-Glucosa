@@ -1,51 +1,85 @@
+# -*- coding: utf-8 -*-
+"""
+Script de preparación de datos de referencia (NTNU)
+Lee los archivos .txt de datos crudos, aplica SNV (Standard Normal Variate)
+a las columnas espectrales y guarda el resultado procesado en formato CSV.
+"""
+
+import os
 import pandas as pd
 import numpy as np
-import os
 
-def preparar_datos_chunked():
-    raw_path = 'data/CalibrationData_NTNU.txt'
-    processed_dir = 'data/processed'
-    os.makedirs(processed_dir, exist_ok=True)
-    parquet_path = os.path.join(processed_dir, 'muestras_referencia_nir.parquet')
+def aplicar_snv(df_espectros):
+    """
+    Aplica Standard Normal Variate (SNV) a las columnas espectrales.
+    SNV = (X - media) / desviación_estándar (fila por fila).
+    """
+    # Asegurar que todas las columnas espectrales sean numéricas
+    df_num = df_espectros.apply(pd.to_numeric, errors='coerce').fillna(0.0)
     
-    # 2. Configuración para procesamiento en chunks
-    chunk_size = 5000  # Reducido para mayor seguridad
+    media_filas = df_num.mean(axis=1)
+    std_filas = df_num.std(axis=1, ddof=1)
+    # Evitar división por cero
+    std_filas = std_filas.replace(0, 1e-8)
+    df_snv = df_num.sub(media_filas, axis=0).div(std_filas, axis=0)
+    return df_snv
+
+def preparar_datos():
+    # Rutas relativas y absolutas dentro del workspace de la aplicación
+    input_path = 'data/raw/ValidationData_NTNU.txt'
+    if not os.path.exists(input_path):
+        input_path = '../ValidationData_NTNU.txt'
+        if not os.path.exists(input_path):
+            input_path = 'ValidationData_NTNU.txt'
+            if not os.path.exists(input_path):
+                input_path = 'data/CalibrationData_NTNU.txt'
+
+    output_dir = 'data/processed'
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = os.path.join(output_dir, 'muestras_referencia_nir.csv')
+
+    print(f"Leyendo archivo de datos crudos desde: {input_path}")
     
-    # Usar integer indexing para evitar problemas de columnas complejas
-    # Columnas esperadas: 
-    # 0: Glucosa, 2: Lactato, 5: Temperatura, 9-end: Absorbancias
-    # Las columnas de absorbancia comienzan en el índice 9.
+    # Intentar lectura con encoding utf-16 (común en archivos NTNU) y fallback a utf-8 / latin1
+    df = None
+    for enc in ['utf-16', 'utf-8', 'latin1']:
+        try:
+            df = pd.read_csv(input_path, sep=r'\s+', header=None, encoding=enc, engine='python', on_bad_lines='skip')
+            if not df.empty:
+                break
+        except Exception:
+            try:
+                df = pd.read_csv(input_path, sep=r'\s+', header=None, encoding=enc, engine='python', error_bad_lines=False)
+                if not df.empty:
+                    break
+            except Exception:
+                continue
+
+    if df is None or df.empty:
+        raise ValueError("No se pudo leer el archivo de datos crudos con los encodings soportados.")
+
+    # Asumir que la primera columna es la glucosa_referencia_mM
+    df.rename(columns={0: 'glucosa_referencia_mM'}, inplace=True)
     
-    first_chunk = True
+    # Asegurar que la columna de referencia sea numérica
+    glucosa_ref = pd.to_numeric(df['glucosa_referencia_mM'], errors='coerce').fillna(0.0)
     
-    print("Iniciando procesamiento de datos en chunks...")
-    
-    # Procesar archivo por partes, saltando las dos primeras líneas
-    # header=None: No tomamos ninguna línea como nombres de columna
-    for chunk in pd.read_csv(raw_path, sep=r'\s+', header=None, skiprows=2, 
-                             encoding='utf-16', chunksize=chunk_size):
-        
-        # Seleccionar las columnas por índice numérico
-        # 0: Glucosa, 2: Lactato, 5: Temperatura
-        # Para las absorbancias, tomaremos las columnas 9 en adelante
-        
-        # Filtramos y renombramos
-        # Columnas: 0 (glucosa), 2 (lactato), 5 (temperatura), 609 (absorbancia 1600nm aprox), 659 (absorbancia 1650nm aprox)
-        # Ajuste de índices basado en que empiezan en 9.
-        df_chunk = chunk.iloc[:, [0, 2, 5, 609, 659]].copy()
-        df_chunk.columns = ['glucosa_referencia_mM', 'lactato_mM', 'temperatura_C', 'absorbancia_1600nm', 'absorbancia_1650nm']
-        
-        # Nota: Aquí no estamos incluyendo todas las absorbancias por simplicidad y memoria.
-        # Si las necesitas, tendrías que seleccionar más columnas numéricas.
-        
-        # 3. Guardar en Parquet (append)
-        if first_chunk:
-            df_chunk.to_parquet(parquet_path, engine='pyarrow', index=True)
-            first_chunk = False
-        else:
-            df_chunk.to_parquet(parquet_path, engine='pyarrow', index=True, append=True)
-            
-    print(f"Procesamiento completado. Datos guardados en: {parquet_path}")
+    # Separar la columna de referencia y las columnas espectrales (restantes)
+    columnas_espectrales = [col for col in df.columns if col != 'glucosa_referencia_mM']
+    df_espectros = df[columnas_espectrales]
+
+    print("Aplicando transformación Standard Normal Variate (SNV) a las columnas espectrales...")
+    df_espectros_snv = aplicar_snv(df_espectros)
+
+    # Reconstruir el DataFrame final con la glucosa y los espectros normalizados
+    df_final = pd.concat([glucosa_ref, df_espectros_snv], axis=1)
+
+    # Guardar el resultado procesado como CSV
+    print(f"Guardando resultado procesado en: {output_path}")
+    df_final.to_csv(output_path, index=False)
+
+    print(f"¡Proceso completado con éxito! Tamaño final del dataset procesado: {df_final.shape}")
+    return df_final
 
 if __name__ == '__main__':
-    preparar_datos_chunked()
+    preparar_datos()

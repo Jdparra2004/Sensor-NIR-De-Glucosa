@@ -412,57 +412,188 @@ with tab4:
                 st.markdown("#### Análisis Estadístico y Fisiológico del Lote")
                 col_g1, col_g2 = st.columns(2)
                 
-                conteo_df = df_resultado["Clasificación_Metabólica"].value_counts().reset_index()
-                conteo_df.columns = ["Categoría", "Muestras"]
+                st.markdown("#### Análisis Estadístico y Fisiológico del Lote")
+                col_g1, col_g2 = st.columns(2)
                 
-                colores_map = {
-                    "Normal": "#2ca02c",
-                    "Rango de Alerta / Sospecha de Prediabetes": "#ff7f0e",
-                    "Nivel Elevado / Sospecha Hiperglucemia": "#d62728",
-                    "Fuera de rango analítico / Indetectable": "#7f7f7f"
-                }
-                bar_colors = [colores_map.get(cat, "#1f77b4") for cat in conteo_df["Categoría"]]
+                candidatos_ref = ['Glucose (mM)', 'glucosa_referencia_mM', 'Glucosa_Real_mM', 'glucosa_mM', 'glucose_mM', 'C_real']
+                col_ref_found = next((c for c in candidatos_ref if c in df_resultado.columns), None)
                 
-                fig_lote_cat = go.Figure()
-                fig_lote_cat.add_trace(go.Bar(
-                    x=conteo_df["Categoría"],
-                    y=conteo_df["Muestras"],
-                    marker_color=bar_colors,
-                    name="Muestras por Estado"
-                ))
-                fig_lote_cat.update_layout(
-                    title="<b>Distribución de Categorías Fisiológicas</b>",
-                    xaxis_title="Estado Metabólico",
-                    yaxis_title="Cantidad de Muestras",
-                    height=350,
-                    showlegend=False,
-                    margin=dict(l=40, r=40, t=50, b=40)
-                )
-                col_g1.plotly_chart(fig_lote_cat)
-                
-                fig_lote_disp = go.Figure()
-                indices_muestras = list(range(1, len(df_resultado) + 1))
-                
-                fig_lote_disp.add_trace(go.Scatter(
-                    x=indices_muestras,
-                    y=df_resultado["Glucosa_Estimada_mM"],
-                    mode="markers",
-                    name="Glucosa Estimada (mM)",
-                    marker=dict(color="#1f77b4", size=5, opacity=0.7)
-                ))
-                fig_lote_disp.add_hline(y=0.20, line_dash="dash", line_color="green", annotation_text="Límite Normal (0.20 mM)")
-                fig_lote_disp.add_hline(y=0.40, line_dash="dash", line_color="red", annotation_text="Umbral Hiperglucemia (0.40 mM)")
-                
-                fig_lote_disp.update_layout(
-                    title="<b>Concentración Estimada por Muestra</b>",
-                    xaxis_title="Índice de Muestra",
-                    yaxis_title="Glucosa [mM]",
-                    height=350,
-                    showlegend=True,
-                    legend=LEYENDA_INFERIOR,
-                    margin=dict(l=40, r=40, t=50, b=40)
-                )
-                col_g2.plotly_chart(fig_lote_disp)
+                if col_ref_found is not None:
+                    c_real = pd.to_numeric(df_resultado[col_ref_found], errors="coerce")
+                    c_est = df_resultado["Glucosa_Estimada_mM"]
+                    
+                    valid_mask = c_real.notna() & c_est.notna()
+                    n_muestras = int(valid_mask.sum())
+                    if n_muestras > 1:
+                        cr_v = c_real[valid_mask]
+                        ce_v = c_est[valid_mask]
+                        mse = np.mean((ce_v - cr_v)**2)
+                        rmse = np.sqrt(mse)
+                        ss_res = np.sum((cr_v - ce_v)**2)
+                        ss_tot = np.sum((cr_v - np.mean(cr_v))**2)
+                        r2 = 1 - (ss_res / ss_tot) if ss_tot > 0 else 0.0
+                    else:
+                        rmse = 0.0
+                        r2 = 0.0
+                    
+                    # 1. Gráfico de Dispersión de Correlación (C_real vs C_estimada) con línea y=x y anotación
+                    fig_corr = go.Figure()
+                    fig_corr.add_trace(go.Scatter(
+                        x=c_real,
+                        y=c_est,
+                        mode='markers',
+                        name='Muestras Lote',
+                        marker=dict(color='#1f77b4', size=6, opacity=0.7)
+                    ))
+                    
+                    min_val = min(c_real.min(), c_est.min())
+                    max_val = max(c_real.max(), c_est.max())
+                    fig_corr.add_trace(go.Scatter(
+                        x=[min_val, max_val],
+                        y=[min_val, max_val],
+                        mode='lines',
+                        name='Ideal (y = x)',
+                        line=dict(color='red', dash='dash')
+                    ))
+                    
+                    anotacion_texto = f"<b>Métricas Dinámicas:</b><br>• R² = {r2:.4f}<br>• RMSE = {rmse:.4f} mM<br>• N = {n_muestras:,}"
+                    fig_corr.add_annotation(
+                        xref="paper", yref="paper",
+                        x=0.05, y=0.95,
+                        text=anotacion_texto,
+                        showarrow=False,
+                        bgcolor="white",
+                        bordercolor="black",
+                        borderwidth=1,
+                        borderpad=4,
+                        font=dict(size=11)
+                    )
+                    
+                    fig_corr.update_layout(
+                        title="<b>Correlación C_real vs C_estimada</b>",
+                        xaxis_title="Concentración Real (mM)",
+                        yaxis_title="Concentración Estimada (mM)",
+                        height=380,
+                        margin=dict(l=40, r=40, t=50, b=40)
+                    )
+                    col_g1.plotly_chart(fig_corr)
+                    
+                    # 2. Matriz de Confusión Clínica (Heatmap)
+                    def cat_real(val):
+                        if pd.isna(val) or val < 0.01 or val > 2.0:
+                            return "Indeterminado"
+                        elif val <= 0.20:
+                            return "Normal"
+                        elif val <= 0.40:
+                            return "Rango de Alerta / Prediabetes"
+                        else:
+                            return "Hiperglucemia"
+                            
+                    def cat_est(val_str):
+                        if pd.isna(val_str):
+                            return "Indeterminado"
+                        if "Normal" in str(val_str):
+                            return "Normal"
+                        elif "Alerta" in str(val_str) or "Prediabetes" in str(val_str):
+                            return "Rango de Alerta / Prediabetes"
+                        elif "Elevado" in str(val_str) or "Hiperglucemia" in str(val_str):
+                            return "Hiperglucemia"
+                        return "Indeterminado"
+
+                    df_resultado["Categoria_Real"] = c_real.apply(cat_real)
+                    df_resultado["Categoria_Estimada"] = df_resultado["Clasificación_Metabólica"].apply(cat_est)
+                    
+                    categorias_orden = [
+                        "Normal",
+                        "Rango de Alerta / Prediabetes",
+                        "Hiperglucemia"
+                    ]
+                    
+                    cm_df = pd.crosstab(
+                        df_resultado["Categoria_Real"],
+                        df_resultado["Categoria_Estimada"],
+                        dropna=False
+                    )
+                    
+                    for cat in categorias_orden:
+                        if cat not in cm_df.index:
+                            cm_df.loc[cat] = 0
+                        if cat not in cm_df.columns:
+                            cm_df[cat] = 0
+                    cm_df = cm_df.reindex(index=categorias_orden, columns=categorias_orden, fill_value=0)
+                    
+                    fig_cm = go.Figure(data=go.Heatmap(
+                        z=cm_df.values,
+                        x=categorias_orden,
+                        y=categorias_orden,
+                        colorscale='Blues',
+                        text=cm_df.values,
+                        texttemplate="%{text}",
+                        textfont={"size": 14},
+                        hoverinfo='z'
+                    ))
+                    
+                    fig_cm.update_layout(
+                        title="<b>Matriz de Confusión Clínica (Heatmap)</b>",
+                        xaxis_title="Categoría Estimada",
+                        yaxis_title="Categoría Real",
+                        height=380,
+                        margin=dict(l=40, r=40, t=50, b=40)
+                    )
+                    col_g2.plotly_chart(fig_cm)
+                    
+                else:
+                    conteo_df = df_resultado["Clasificación_Metabólica"].value_counts().reset_index()
+                    conteo_df.columns = ["Categoría", "Muestras"]
+                    
+                    colores_map = {
+                        "Normal": "#2ca02c",
+                        "Rango de Alerta / Sospecha de Prediabetes": "#ff7f0e",
+                        "Nivel Elevado / Sospecha Hiperglucemia": "#d62728",
+                        "Fuera de rango analítico / Indetectable": "#7f7f7f"
+                    }
+                    bar_colors = [colores_map.get(cat, "#1f77b4") for cat in conteo_df["Categoría"]]
+                    
+                    fig_lote_cat = go.Figure()
+                    fig_lote_cat.add_trace(go.Bar(
+                        x=conteo_df["Categoría"],
+                        y=conteo_df["Muestras"],
+                        marker_color=bar_colors,
+                        name="Muestras por Estado"
+                    ))
+                    fig_lote_cat.update_layout(
+                        title="<b>Distribución de Categorías Fisiológicas</b>",
+                        xaxis_title="Estado Metabólico",
+                        yaxis_title="Cantidad de Muestras",
+                        height=350,
+                        showlegend=False,
+                        margin=dict(l=40, r=40, t=50, b=40)
+                    )
+                    col_g1.plotly_chart(fig_lote_cat)
+                    
+                    fig_lote_disp = go.Figure()
+                    indices_muestras = list(range(1, len(df_resultado) + 1))
+                    
+                    fig_lote_disp.add_trace(go.Scatter(
+                        x=indices_muestras,
+                        y=df_resultado["Glucosa_Estimada_mM"],
+                        mode="markers",
+                        name="Glucosa Estimada (mM)",
+                        marker=dict(color="#1f77b4", size=5, opacity=0.7)
+                    ))
+                    fig_lote_disp.add_hline(y=0.20, line_dash="dash", line_color="green", annotation_text="Límite Normal (0.20 mM)")
+                    fig_lote_disp.add_hline(y=0.40, line_dash="dash", line_color="red", annotation_text="Umbral Hiperglucemia (0.40 mM)")
+                    
+                    fig_lote_disp.update_layout(
+                        title="<b>Concentración Estimada por Muestra</b>",
+                        xaxis_title="Índice de Muestra",
+                        yaxis_title="Glucosa [mM]",
+                        height=350,
+                        showlegend=True,
+                        legend=LEYENDA_INFERIOR,
+                        margin=dict(l=40, r=40, t=50, b=40)
+                    )
+                    col_g2.plotly_chart(fig_lote_disp)
                 
                 col_btn1, col_btn2 = st.columns(2)
                 excel_bytes = generar_excel_multihoja_estetico(df_resultado, lambda_nm, L_mm)
