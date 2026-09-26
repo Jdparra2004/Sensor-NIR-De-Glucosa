@@ -13,6 +13,7 @@ import plotly.graph_objects as go
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
+from sklearn.metrics import confusion_matrix
 
 from core.modelo_optico import ModeloBeerLambertNIR, ModeloPLSRegresionNIR
 from core.modelo_microfluido import ModeloMicrofluido
@@ -478,9 +479,12 @@ with tab4:
                     )
                     col_g1.plotly_chart(fig_corr)
                     
-                    # 2. Matriz de Confusión Clínica (Heatmap)
-                    def cat_real(val):
-                        if pd.isna(val) or val < 0.01 or val > 2.0:
+                    # 2. Factor de Dilución Simulado para etiquetas clínicas (escala sudor: 0 a ~1.0 mM)
+                    c_real_dil = c_real / 50.0
+                    c_est_dil = c_est / 50.0
+                    
+                    def asignar_categoria(val):
+                        if pd.isna(val) or val < 0.0:
                             return "Indeterminado"
                         elif val <= 0.20:
                             return "Normal"
@@ -489,47 +493,29 @@ with tab4:
                         else:
                             return "Hiperglucemia"
                             
-                    def cat_est(val_str):
-                        if pd.isna(val_str):
-                            return "Indeterminado"
-                        if "Normal" in str(val_str):
-                            return "Normal"
-                        elif "Alerta" in str(val_str) or "Prediabetes" in str(val_str):
-                            return "Rango de Alerta / Prediabetes"
-                        elif "Elevado" in str(val_str) or "Hiperglucemia" in str(val_str):
-                            return "Hiperglucemia"
-                        return "Indeterminado"
-
-                    df_resultado["Categoria_Real"] = c_real.apply(cat_real)
-                    df_resultado["Categoria_Estimada"] = df_resultado["Clasificación_Metabólica"].apply(cat_est)
+                    y_real_cat = c_real_dil.apply(asignar_categoria)
+                    y_est_cat = c_est_dil.apply(asignar_categoria)
                     
-                    categorias_orden = [
-                        "Normal",
-                        "Rango de Alerta / Prediabetes",
-                        "Hiperglucemia"
-                    ]
+                    labels_clase = ["Normal", "Rango de Alerta / Prediabetes", "Hiperglucemia"]
                     
-                    cm_df = pd.crosstab(
-                        df_resultado["Categoria_Real"],
-                        df_resultado["Categoria_Estimada"],
-                        dropna=False
-                    )
-                    
-                    for cat in categorias_orden:
-                        if cat not in cm_df.index:
-                            cm_df.loc[cat] = 0
-                        if cat not in cm_df.columns:
-                            cm_df[cat] = 0
-                    cm_df = cm_df.reindex(index=categorias_orden, columns=categorias_orden, fill_value=0)
-                    
+                    # Generar Matriz de Confusión usando sklearn.metrics.confusion_matrix
+                    mask_validas = y_real_cat.isin(labels_clase) & y_est_cat.isin(labels_clase)
+                    if mask_validas.sum() > 0:
+                        matriz_cm = confusion_matrix(
+                            y_real_cat[mask_validas],
+                            y_est_cat[mask_validas],
+                            labels=labels_clase
+                        )
+                    else:
+                        matriz_cm = np.zeros((3, 3), dtype=int)
+                        
                     fig_cm = go.Figure(data=go.Heatmap(
-                        z=cm_df.values,
-                        x=categorias_orden,
-                        y=categorias_orden,
-                        colorscale='Blues',
-                        text=cm_df.values,
+                        z=matriz_cm,
+                        x=labels_clase,
+                        y=labels_clase,
+                        text=matriz_cm,
                         texttemplate="%{text}",
-                        textfont={"size": 14},
+                        colorscale="Blues",
                         hoverinfo='z'
                     ))
                     
