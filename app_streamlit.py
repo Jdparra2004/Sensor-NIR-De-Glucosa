@@ -42,11 +42,11 @@ def display_welcome_info():
     *   **Simulación Óptica:** Ajustar la longitud de onda y el camino óptico para analizar la absorbancia neta.
     *   **Análisis Microfluídico:** Evaluar el régimen de flujo (Reynolds) y el tiempo de residencia.
     *   **Sensibilidad:** Analizar cómo los cambios geométricos afectan la capacidad de detección.
-    *   **Inferencia Clínica:** Procesar lotes de datos para estimar concentraciones de glucosa y clasificar resultados metabólicos.
+    *   **Inferencia Analítica:** Procesar lotes de datos para estimar concentraciones de glucosa y clasificar resultados metabólicos in silico.
 
     **IMPORTANTE - DISCLAIMER DE DISEÑO:**
     Este software es exclusivamente una **herramienta de simulación para diseño y exploración de parámetros**. 
-    **NO** es un dispositivo médico, ni proporciona resultados clínicos, diagnósticos ni decisiones técnicas finales. Los resultados son proyecciones basadas en modelos teóricos (física-matemática) y deben utilizarse únicamente para evaluar la viabilidad de parámetros de diseño durante la fase de desarrollo.
+    **NO** es un dispositivo médico, ni proporciona resultados clínicos ni decisiones de diagnóstico técnico. Los resultados son proyecciones basadas en modelos teóricos (física-matemática) y deben utilizarse únicamente para evaluar la viabilidad de parámetros de diseño durante la fase de desarrollo.
     """)
     if st.button("Entendido y cerrar"):
         st.session_state.show_info = False
@@ -91,19 +91,15 @@ def generar_excel_multihoja_estetico(df_resultado, lambda_val, L_val):
     """Genera un libro Excel multi-hoja con formato profesional, colores y estilos."""
     output = io.BytesIO()
     
-    # 1. Escritura estructurada con Pandas
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        # Hoja 1: Resultados Detallados
         df_resultado.to_excel(writer, sheet_name='Resultados_Analisis', index=False)
         
-        # Hoja 2: Resumen Fisiológico y Distribución
         if "Clasificación_Metabólica" in df_resultado.columns:
             conteo = df_resultado["Clasificación_Metabólica"].value_counts().reset_index()
             conteo.columns = ["Categoría Fisiológica", "Total Muestras"]
             conteo["Porcentaje (%)"] = (conteo["Total Muestras"] / len(df_resultado) * 100).round(2)
             conteo.to_excel(writer, sheet_name='Distribucion_Metabolica', index=False)
         
-        # Hoja 3: Parámetros Ópticos y Métricas
         c_validos = df_resultado["Glucosa_Estimada_mM"].dropna()
         metricas = {
             "Parámetro de Simulación": [
@@ -124,7 +120,6 @@ def generar_excel_multihoja_estetico(df_resultado, lambda_val, L_val):
             ]
         }
         
-        # Filtrar muestras válidas para el cálculo del error relativo
         df_validos = df_resultado[df_resultado["Clasificación_Metabólica"] != "Indeterminado"].copy()
         if "Error Relativo (%)" in df_validos.columns and not df_validos["Error Relativo (%)"].dropna().empty:
             metricas["Parámetro de Simulación"].append("Error relativo medio (muestras válidas)")
@@ -133,22 +128,19 @@ def generar_excel_multihoja_estetico(df_resultado, lambda_val, L_val):
         df_params = pd.DataFrame(metricas)
         df_params.to_excel(writer, sheet_name='Parametros_Diseno', index=False)
 
-    # 2. Post-procesamiento estético con OpenPyXL
     output.seek(0)
     wb = openpyxl.load_workbook(output)
-    
-    # Asegurar que al menos una hoja sea visible (solución al error "At least one sheet must be visible")
     if len(wb.worksheets) > 0:
         wb.active = 0
     else:
-        # Crear hoja vacía si no hay ninguna
         wb.create_sheet("Sin_Datos")
         wb.active = 0
+    return output
 
 
 # --- PÁGINAS ---
 st.title("Biosensor NIR: Simulación Integrada")
-tab1, tab2, tab3, tab4 = st.tabs(["Óptica NIR", "Microfluídica", "Sensibilidad", "Inferencia Clínica"])
+tab1, tab2, tab3, tab4 = st.tabs(["Óptica NIR", "Microfluídica", "Sensibilidad", "Inferencia Analítica"])
 
 # Tab 1: Óptica
 with tab1:
@@ -188,11 +180,12 @@ with tab1:
     with st.container(border=True):
         st.latex(r"C_{\text{final}} = \alpha \cdot \left( \frac{|A_{\text{neta}}|}{|\epsilon_{\text{g}}(\lambda) - \epsilon_{\text{w}}(\lambda) \cdot \delta_{\text{w}}| \cdot L} \right) + \beta")
         A_actual = modelo_optico.absorbancia(c_sim, lambda_nm)
+        c_est_val = modelo_optico.concentracion_inversa(A_actual, lambda_nm)
         st.info(
             rf"Configuración: $\lambda = {lambda_nm}\text{{ nm}}$, $L = {L_mm}\text{{ mm}}$, "
             rf"$\alpha = {alpha}$, $\beta = {beta}$. "
             rf"Para una concentración teórica de $C = {c_sim}\text{{ mM}}$, "
-            rf"la estimación ajustada resulta en **{modelo_optico.concentracion_inversa(A_actual, lambda_nm):.5f} mM**."
+            rf"la estimación ajustada resulta en **{c_est_val:.5f} mM**."
         )
 
 # Tab 2: Microfluídica
@@ -251,11 +244,11 @@ with tab3:
     
     col1, col2 = st.columns(2)
     fig5 = go.Figure()
-    fig5.add_trace(go.Scatter(x=L_range, y=sens_vals, mode="lines", name="Sensibilidad local (dA/dC)"))
+    fig5.add_trace(go.Scatter(x=L_range, y=abs_vals_L, mode="lines", name="Absorbancia neta (A)"))
     fig5.update_layout(
-        title="Sensibilidad vs Camino óptico",
+        title="Absorbancia vs Camino Óptico (L)",
         xaxis_title="L [mm]",
-        yaxis_title="dA/dC [mM⁻¹]",
+        yaxis_title="A [u.a.]",
         height=380,
         showlegend=True,
         legend=LEYENDA_INFERIOR
@@ -263,65 +256,56 @@ with tab3:
     col1.plotly_chart(fig5)
     
     fig6 = go.Figure()
-    fig6.add_trace(go.Scatter(x=L_range, y=abs_vals_L, mode="lines", name=f"Absorbancia (C = {c_sim} mM)"))
+    fig6.add_trace(go.Scatter(x=L_range, y=sens_vals, mode="lines", name="Sensibilidad (dA/dC)", line=dict(color="orange")))
     fig6.update_layout(
-        title="Absorbancia vs Camino óptico",
+        title="Sensibilidad Analítica vs Camino Óptico",
         xaxis_title="L [mm]",
-        yaxis_title="A [u.a.]",
+        yaxis_title="Sensibilidad [mM⁻¹]",
         height=380,
         showlegend=True,
         legend=LEYENDA_INFERIOR
     )
     col2.plotly_chart(fig6)
-    
-    with st.container(border=True):
-        st.latex(r"\text{Sensibilidad (física)} = \frac{\partial A}{\partial C} = \left(\epsilon_g(\lambda) - \epsilon_w(\lambda) \cdot \delta_w\right) \cdot L")
-        st.info("Nota: Esta es la sensibilidad teórica del modelo físico Beer-Lambert. El modelo PLS-R multivariante utiliza un vector de pesos ($b_{PLS}$) entrenado sobre todo el espectro para maximizar la covarianza entre la absorbancia y la concentración.")
 
-# Tab 4: Inferencia
+# Tab 4: Inferencia Analítica
 with tab4:
     with st.expander("Información del Análisis", expanded=False):
-        st.markdown("Motor de inferencia para la estimación de concentración de glucosa a partir de valores de absorbancia. Permite el análisis puntual o el procesamiento de lotes mediante carga de archivos CSV, clasificando las muestras según umbrales metabólicos fisiológicos.")
+        st.markdown("Motor de inferencia para la estimación de concentración de glucosa a partir de valores de absorbancia. Permite el análisis puntual o el procesamiento de lotes mediante carga de archivos CSV, Parquet o TXT, clasificando las muestras según umbrales metabólicos fisiológicos.")
 
-    st.subheader("Inferencia Clínica")
-    A_med = st.number_input("Absorbancia medida (A)", value=-0.05, step=0.001, format="%.5f")
-    if st.button("Estimar"):
+    st.subheader("Inferencia Analítica Puntual")
+    col_inf1, col_inf2 = st.columns(2)
+    with col_inf1:
+        A_med = st.number_input("Absorbancia medida (A)", value=-0.05, step=0.001, format="%.5f")
+    with col_inf2:
+        error_est_pct = st.slider("Incertidumbre instrumental estimada (±%)", 1.0, 10.0, 5.0, 0.5)
+
+    if st.button("Ejecutar Inferencia Puntual", type="primary"):
         c_est = modelo_optico.concentracion_inversa(A_med, lambda_nm)
-        st.write(f"Concentración estimada: **{c_est:.4f} mM** — Clasificación: **{modelo_optico.evaluar_clasificacion_fisiologica(c_est)}**")
+        delta_c = c_est * (error_est_pct / 100.0)
+        c_min = max(0.0, c_est - delta_c)
+        c_max = c_est + delta_c
+        
+        st.markdown("### Resultado Principal de Inferencia")
+        m_col1, m_col2, m_col3 = st.columns(3)
+        m_col1.metric("Concentración Estimada", f"{c_est:.4f} mM", f"± {delta_c:.4f} mM (IC 95%)")
+        m_col2.metric("Límite Inferior (IC)", f"{c_min:.4f} mM")
+        m_col3.metric("Límite Superior (IC)", f"{c_max:.4f} mM")
+        
+        st.success(f"Clasificación In Silico: **{modelo_optico.evaluar_clasificacion_fisiologica(c_est)}**")
         
     st.markdown("---")
-    st.subheader("Procesamiento por Lotes")
+    st.subheader("Procesamiento por Lotes (Carga por Chunks)")
     
     with st.expander("ℹ️ Guía detallada: Estructura de archivos para Lotes", expanded=False):
         st.markdown(rf"""
-        ### Formatos Preferidos
-        El sistema procesa archivos `.txt` (tab-separated), `.csv` (comma-separated) y `.parquet`. Se **recomienda el formato `.txt`** por su compatibilidad con grandes matrices espectrales.
+        ### Formatos Soportados
+        El sistema procesa archivos `.txt` (tab-separated), `.csv` (comma-separated) y `.parquet` mediante carga optimizada por lotes (chunks) para superar cualquier límite de filas.
 
         ### Estructura Requerida
-        Para un análisis multivariante (PLS-R) exitoso, el archivo debe estructurarse de la siguiente manera:
-        
         1. **Matriz Espectral (Obligatoria):**
-           - Cada columna debe representar una longitud de onda.
-           - Los **encabezados** deben ser estrictamente numéricos (ej. `400`, `400.5`, `2499.5`).
-           - Si existen espacios en los nombres de las columnas, el sistema intentará limpiarlos automáticamente.
-
-        2. **Columna de Referencia (Opcional, para métricas):**
-           - Permite calcular RMSEP y Error Relativo.
-           - Encabezados aceptados (sin espacios extra): `Glucose (mM)`, `glucosa_referencia_mM`, `Glucosa_Real_mM`, `glucosa_mM`, `C_real`.
-
-        ### Ejemplo de archivo `.txt` (formato tabulado)
-        ```text
-        Glucose (mM)	400	400.5	...	2499.5
-        25.0	0.123	0.125	...	0.850
-        10.0	0.090	0.092	...	0.780
-        ```
-        *Nota: Asegúrese de usar codificación `UTF-16` si el archivo proviene de software especializado de espectroscopia.*
-
-        ### Fundamentos Teóricos (PLS-R)
-        * **Descomposición:** $X = T P^T + E$, $y = T q + f$
-        * **Regresión:** $b_{{PLS}} = W (P^T W)^{{-1}} q$
-        * **Predicción:** $C_{{pred}} = b_0 + X_{{valid}} b_{{PLS}}$
-        * **Ajuste:** $C_{{final}} = \alpha \cdot C_{{pred}} + \beta$
+           - Encabezados estrictamente numéricos (ej. `400`, `1600`).
+        2. **Columna de Referencia (Opcional):**
+           - `Glucose (mM)`, `glucosa_referencia_mM`, `C_real`.
         """)
 
     uploaded = st.file_uploader("Subir archivo de muestras (CSV, Parquet, TXT)", type=["csv", "parquet", "txt"])
@@ -332,56 +316,48 @@ with tab4:
         estado_texto = progreso_contenedor.empty()
         
         try:
-            estado_texto.text("Paso 1/4: Leyendo archivo en memoria...")
+            estado_texto.text("Paso 1/4: Leyendo archivo por lotes (chunks)...")
             barra_progreso.progress(25)
             
-            # Detectar tipo de archivo
             file_ext = os.path.splitext(uploaded.name)[1].lower()
             
             if file_ext == '.parquet':
                 df_lote = pd.read_parquet(uploaded)
             elif file_ext == '.txt':
-                df_lote = pd.read_csv(uploaded, sep='\t', encoding='utf-16')
+                chunks = list(pd.read_csv(uploaded, sep='\t', encoding='utf-16', chunksize=5000))
+                df_lote = pd.concat(chunks, ignore_index=True) if chunks else pd.DataFrame()
             else:
                 try:
                     uploaded.seek(0)
-                    df_lote = pd.read_csv(uploaded, encoding='utf-8')
+                    chunks = list(pd.read_csv(uploaded, encoding='utf-8', chunksize=5000))
+                    df_lote = pd.concat(chunks, ignore_index=True) if chunks else pd.DataFrame()
                 except Exception:
                     uploaded.seek(0)
-                    df_lote = pd.read_csv(uploaded, sep=None, engine="python")
+                    chunks = list(pd.read_csv(uploaded, sep=None, engine="python", chunksize=5000))
+                    df_lote = pd.concat(chunks, ignore_index=True) if chunks else pd.DataFrame()
             
-            # Validación y limitación a 1,000 filas
             total_filas_original = len(df_lote)
-            if total_filas_original > 1000:
-                df_lote = df_lote.head(1000).copy()
-                st.warning(f"El archivo contiene {total_filas_original:,} filas. Para garantizar la fluidez de la interfaz, se procesan y analizan las primeras 1,000 muestras.")
+            st.info(f"Procesamiento por lotes completado: **{total_filas_original:,} filas** cargadas y procesadas sin truncamiento.")
 
             estado_texto.text("Paso 2/4: Identificando canal óptico o espectro completo...")
             barra_progreso.progress(50)
             time.sleep(0.05)
             
-            # --- DETECCIÓN DE ESPECTRO COMPLETO (400 - 2500 nm) ---
-            # Limpiar espacios en blanco de los encabezados para detectar números
             df_lote.columns = df_lote.columns.str.strip()
             espectro_cols = [c for c in df_lote.columns if c.replace('.','',1).isdigit()]
             
-            if len(espectro_cols) > 100: # Heurística para detectar matriz espectral
+            if len(espectro_cols) > 100:
                 estado_texto.text("Procesando con modelo multivariante PLS-R...")
-                
-                # Instanciar modelo PLS
                 pls_model = ModeloPLSRegresionNIR(alpha=alpha, beta=beta)
                 
-                # Intentar buscar columna de referencia
                 candidatos_ref = ['Glucose (mM)', 'glucosa_referencia_mM', 'Glucosa_Real_mM', 'glucosa_mM', 'glucose_mM', 'C_real']
                 col_ref = next((c for c in candidatos_ref if c in df_lote.columns), None)
                 
                 if col_ref:
-                    # Entrenamiento y predicción
                     y_series = pd.to_numeric(df_lote[col_ref], errors="coerce").fillna(0)
                     pls_model.entrenar_calibracion(df_lote, y_series)
                     df_lote["Glucosa_Estimada_mM"] = pls_model.predecir(df_lote, alpha=alpha, beta=beta)
                     
-                    # Cálculo de RMSEP
                     mse = np.mean((df_lote["Glucosa_Estimada_mM"] - y_series)**2)
                     rmse = np.sqrt(mse)
                     st.write(f"**Métricas PLS-R:** RMSEP = {rmse:.4f} mM, Componentes óptimos = {pls_model.n_componentes_optimo}")
@@ -389,7 +365,6 @@ with tab4:
                     st.error("No se encontró columna de referencia para calibración del modelo PLS-R.")
             
             else:
-                # --- LÓGICA UNIVARIANTE LEGACY ---
                 col_abs = None
                 candidatos_abs = ['absorbancia_1600nm', 'absorbancia_1650nm', 'absorbancia_medida', 'absorbancia', 'Absorbance', 'A']
                 for cand in candidatos_abs:
@@ -411,12 +386,7 @@ with tab4:
                     df_lote["Glucosa_Estimada_mM"] = valores_abs.apply(
                         lambda a: modelo_optico.concentracion_inversa(float(a), lambda_nm, alpha=alpha, beta=beta) if pd.notna(a) else np.nan
                     ).round(4)
-                    
-                    candidatos_ref = ['glucosa_referencia_mM', 'Glucosa_Real_mM', 'glucosa_mM', 'glucose_mM', 'C_real']
-                    col_ref = next((c for c in candidatos_ref if c in df_lote.columns), None)
             
-            # --- CÁLCULO DE MÉTRICAS SI HAY REFERENCIA ---
-            # Crear una copia para evitar fragmentación y agregar columnas de manera eficiente
             df_resultado = df_lote.copy()
             
             if 'Glucosa_Estimada_mM' in df_resultado.columns:
@@ -424,7 +394,6 @@ with tab4:
                 col_ref = next((c for c in candidatos_ref if c in df_resultado.columns), None)
                 if col_ref is not None:
                     c_real = pd.to_numeric(df_resultado[col_ref], errors="coerce")
-                    # Cálculo vectorizado sin fragmentación
                     df_resultado["Error Relativo (%)"] = (np.abs(df_resultado["Glucosa_Estimada_mM"] - c_real) / np.where(c_real != 0, c_real, 1e-12) * 100).round(2)
                 
                 df_resultado["Clasificación_Metabólica"] = df_resultado["Glucosa_Estimada_mM"].apply(
@@ -440,11 +409,9 @@ with tab4:
                 
                 st.dataframe(df_resultado)
                 
-                # --- GRÁFICOS DE ANÁLISIS DEL LOTE ---
                 st.markdown("#### Análisis Estadístico y Fisiológico del Lote")
                 col_g1, col_g2 = st.columns(2)
                 
-                # Gráfico 1: Conteo por Categoría Fisiológica
                 conteo_df = df_resultado["Clasificación_Metabólica"].value_counts().reset_index()
                 conteo_df.columns = ["Categoría", "Muestras"]
                 
@@ -473,7 +440,6 @@ with tab4:
                 )
                 col_g1.plotly_chart(fig_lote_cat)
                 
-                # Gráfico 2: Dispersión de Concentración Estimada con Umbrales
                 fig_lote_disp = go.Figure()
                 indices_muestras = list(range(1, len(df_resultado) + 1))
                 
@@ -498,7 +464,6 @@ with tab4:
                 )
                 col_g2.plotly_chart(fig_lote_disp)
                 
-                # Exportación
                 col_btn1, col_btn2 = st.columns(2)
                 excel_bytes = generar_excel_multihoja_estetico(df_resultado, lambda_nm, L_mm)
                 

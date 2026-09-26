@@ -17,6 +17,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 from pathlib import Path
+from scipy import stats
+from sklearn.metrics import r2_score, mean_squared_error
 
 
 # ---------------------------------------------------------------------------
@@ -258,3 +260,65 @@ def graficar_parametros_microfluido(df: pd.DataFrame,
         fig.savefig(f"{ruta}/parametros_microfluido.png",
                     dpi=150, bbox_inches="tight")
     return fig
+
+
+# ---------------------------------------------------------------------------
+# GRÁFICA 6: Concentración Real vs Estimada (Validación Analítica)
+# ---------------------------------------------------------------------------
+
+def graficar_concentracion_real_vs_estimada(df: pd.DataFrame,
+                                            col_real: str = "glucosa_referencia_mM",
+                                            col_est: str = "glucosa_estimada_mM",
+                                            guardar: bool = False,
+                                            ruta: str = "outputs"):
+    """
+    Gráfica de concentración real vs estimada con línea ideal y=x,
+    diferenciación por colores, y métricas impresas (n, Pearson r, R^2, RMSE).
+    """
+    fig, ax = plt.subplots(figsize=(8, 6))
+    
+    possible_real = [col_real, 'Glucose (mM)', 'glucosa_mM', 'C_real']
+    possible_est = [col_est, 'glucosa_estimada_mM', 'c_est']
+
+    r_col = next((c for c in possible_real if c in df.columns), col_real)
+    e_col = next((c for c in possible_est if c in df.columns), col_est)
+
+    sub = df[[r_col, e_col]].dropna()
+    y_true = sub[r_col].values
+    y_pred = sub[e_col].values
+    n = len(y_true)
+    
+    if n > 1:
+        r_val, _ = stats.pearsonr(y_true, y_pred)
+        r2 = r2_score(y_true, y_pred)
+        rmse = np.sqrt(mean_squared_error(y_true, y_pred))
+    else:
+        r_val, r2, rmse = 0.0, 0.0, 0.0
+
+    ax.scatter(y_true, y_pred, color=COLORES[0], alpha=0.75, edgecolors='k', s=60, label="Datos Inferencia / Simulación")
+    
+    min_val = min(y_true.min() if n > 0 else 0, y_pred.min() if n > 0 else 0)
+    max_val = max(y_true.max() if n > 0 else 1, y_pred.max() if n > 1 else 1)
+    ax.plot([min_val, max_val], [min_val, max_val], color='red', linestyle='--', lw=1.5, label="Línea ideal (y = x)")
+    
+    ax.set_xlabel("Concentración Real / Referencia [mM]")
+    ax.set_ylabel("Concentración Estimada [mM]")
+    ax.set_title("Validación Analítica: Concentración Real vs Estimada", fontweight="bold")
+    ax.legend(loc="upper left")
+    
+    texto_metricas = (
+        f"n = {n}\n"
+        f"Pearson r = {r_val:.4f}\n"
+        f"R² = {r2:.4f}\n"
+        f"RMSE = {rmse:.4f} mM"
+    )
+    props = dict(boxstyle='round', facecolor='wheat', alpha=0.85)
+    ax.text(0.05, 0.75, texto_metricas, transform=ax.transAxes, fontsize=10,
+            verticalalignment='top', bbox=props)
+
+    plt.tight_layout()
+    if guardar:
+        Path(ruta).mkdir(exist_ok=True)
+        fig.savefig(f"{ruta}/real_vs_estimada.png", dpi=150, bbox_inches="tight")
+    return fig
+

@@ -7,7 +7,7 @@ Este documento proporciona una guía técnica sobre el uso y las capacidades de 
 ## 📋 Introducción
 El Biosensor NIR es una herramienta de simulación numérica avanzada para la evaluación de parámetros en sistemas de detección óptica de glucosa en sudor mediante espectroscopia infrarroja cercana (NIR).
 
-> **⚠️ AVISO LEGAL:** Esta aplicación es **exclusivamente una herramienta de simulación para diseño y exploración**. **NO** es un dispositivo médico y no proporciona diagnósticos clínicos.
+> **⚠️ AVISO LEGAL:** Esta aplicación es **exclusivamente una herramienta de simulación para diseño y exploración**. **NO** es un dispositivo médico y no proporciona diagnósticos ni resultados clínicos.
 
 ---
 
@@ -38,7 +38,7 @@ Evalúa la hidrodinámica del canal. Calcula el **Número de Reynolds** (para co
 ### 3. Sensibilidad
 Estudia la relación entre la geometría del biosensor ($L$) y la sensibilidad local ($dA/dC$). Ayuda a identificar el diseño geométrico óptimo para la detección.
 
-### 4. Inferencia Clínica
+### 4. Inferencia Analítica
 Motor de procesamiento para la estimación de concentración de glucosa a partir de valores de absorbancia (puntual o por lotes).
 
 ---
@@ -50,7 +50,7 @@ Para analizar múltiples muestras:
 2. **Estructura Requerida:**
    - **Matriz Espectral:** Columnas con encabezados numéricos representando las longitudes de onda (ej. `400`, `1600`).
    - **Columna de Referencia (Opcional):** Encabezados reconocidos como `Glucose (mM)`, `glucosa_referencia_mM`, etc.
-3. Suba el archivo en la pestaña "Inferencia Clínica" y el sistema aplicará automáticamente el modelo de regresión multivariante (**PLS-R**) si detecta una matriz espectral completa, o el modelo univariante si solo detecta columnas de absorbancia.
+3. Suba el archivo en la pestaña "Inferencia Analítica" y el sistema aplicará automáticamente el modelo de regresión multivariante (**PLS-R**) si detecta una matriz espectral completa, o el modelo univariante si solo detecta columnas de absorbancia.
 4. Descargue el reporte final en formato Excel (`.xlsx`) o CSV.
 
 ---

@@ -2,7 +2,7 @@
 
 **Evaluación paramétrica de un modelo matemático para el monitoreo no invasivo de glucosa en el sudor, mediante simulación numérica computacional basada en detección óptica de infrarrojo cercano (NIR).**
 
-Este software es una herramienta de simulación avanzada que integra la física de la espectroscopia NIR, la dinámica de fluidos en microcanales y un motor de inferencia clínica para el diagnóstico preventivo de diabetes.
+Este software es una herramienta de simulación avanzada que integra la física de la espectroscopia NIR, la dinámica de fluidos en microcanales y un motor de inferencia analítica para la estimación cuantitativa de glucosa.
 
 ---
 
@@ -10,11 +10,11 @@ Este software es una herramienta de simulación avanzada que integra la física 
 
 * **Modelo Óptico de Precisión:** Implementación de la Ley de Beer-Lambert adaptada con el fenómeno de **desplazamiento de agua** (Water Displacement), fundamental para la detección en medios acuosos diluidos.
 * **Análisis Microfluídico:** Validación de régimen laminar mediante el cálculo automático de los números de **Reynolds** y **Péclet**, además del tiempo de residencia en la cámara de detección.
-* **Dashboard Clínico Avanzado (Web):**
+* **Dashboard Analítico Avanzado (Web):**
   * Interfaz interactiva mediante **Streamlit**.
   * **Inferencia Inversa:** Cálculo de la concentración de glucosa [$mM$] a partir de la absorbancia medida por el sensor.
-  * **Semáforo de Riesgo:** Clasificación visual inmediata (Normal, Prediabetes, Hiperglucemia) según rangos fisiológicos de literatura.
-  * **Análisis de Incertidumbre:** Modelado de la confianza del diagnóstico basado en el ruido fotométrico del hardware (Distribución Gaussiana).
+  * **Semáforo de Riesgo:** Clasificación in silico inmediata (Normal, Prediabetes, Hiperglucemia) según rangos fisiológicos de literatura.
+  * **Análisis de Incertidumbre:** Modelado de la confianza de la estimación basado en el ruido fotométrico del hardware (Distribución Gaussiana).
 * **Exportación de Datos:** Generación de reportes técnicos en formatos CSV y JSON con selección de ruta personalizada.
 * **QA Integrado:** Suite de pruebas unitarias que garantizan la integridad de los cálculos físicos y lógicos.
 
