@@ -18,7 +18,7 @@ from sklearn.metrics import confusion_matrix
 from core.modelo_optico import ModeloBeerLambertNIR, ModeloPLSRegresionNIR
 from core.modelo_microfluido import ModeloMicrofluido
 
-st.set_page_config(page_title="Biosensor NIR - Glucosa en Sudor", layout="wide")
+st.set_page_config(page_title="Biosensor NIR - Glucosa en Sudor (In Silico)", layout="wide")
 
 # Configuración estándar de leyenda fija inferior
 LEYENDA_INFERIOR = dict(
@@ -35,7 +35,7 @@ if 'show_info' not in st.session_state:
 
 def display_welcome_info():
     """Muestra la ventana de bienvenida con información del proyecto y disclaimer."""
-    st.info("### Bienvenido al Biosensor NIR: Simulador Paramétrico")
+    st.info("### Bienvenido al Biosensor NIR: Simulador Paramétrico In Silico")
     st.markdown("""
     Esta aplicación es una **herramienta de simulación numérica** diseñada para explorar los parámetros de diseño en sistemas de detección óptica de glucosa en sudor mediante espectroscopia NIR.
 
@@ -43,11 +43,11 @@ def display_welcome_info():
     *   **Simulación Óptica:** Ajustar la longitud de onda y el camino óptico para analizar la absorbancia neta.
     *   **Análisis Microfluídico:** Evaluar el régimen de flujo (Reynolds) y el tiempo de residencia.
     *   **Sensibilidad:** Analizar cómo los cambios geométricos afectan la capacidad de detección.
-    *   **Inferencia Analítica:** Procesar lotes de datos para estimar concentraciones de glucosa y clasificar resultados metabólicos in silico.
+    *   **Inferencia In Silico:** Procesar lotes de datos para estimar concentraciones de glucosa y realizar estratificación de riesgo metabólico / apoyo al monitoreo.
 
     **IMPORTANTE - DISCLAIMER DE DISEÑO:**
     Este software es exclusivamente una **herramienta de simulación para diseño y exploración de parámetros**. 
-    **NO** es un dispositivo médico, ni proporciona resultados clínicos ni decisiones de diagnóstico técnico. Los resultados son proyecciones basadas en modelos teóricos (física-matemática) y deben utilizarse únicamente para evaluar la viabilidad de parámetros de diseño durante la fase de desarrollo.
+    **NO** es un dispositivo médico, ni proporciona resultados de diagnóstico técnico ni inferencia clínica directa. Los resultados son proyecciones basadas en modelos teóricos (física-matemática) y deben utilizarse únicamente para evaluar la viabilidad de parámetros de diseño durante la fase de desarrollo.
     """)
     if st.button("Entendido y cerrar"):
         st.session_state.show_info = False
@@ -74,7 +74,7 @@ noise_instrumental = st.sidebar.checkbox("Inyectar ruido fotométrico instrument
 st.sidebar.subheader("Microfluídica")
 Q_nlmin = st.sidebar.slider("Caudal volumétrico (Q) [nL/min]", 1.0, 10.0, 5.0, 0.1)
 w_um = st.sidebar.slider("Ancho del canal (w) [µm]", 50, 500, 200, 10)
-h_um = st.sidebar.slider("Alto del canal (h) [µm]", 10, 200, 50, 10)
+h_um = st.sidebar.slider("Alto del canal (h) [µm]", 10, 100, 50, 10)  # Rango estricto 10 - 100 um
 largo_mm = st.sidebar.slider("Largo de celda [mm]", 0.5, 5.0, 1.0, 0.5)
 
 st.sidebar.subheader("Calibración Empírica")
@@ -89,21 +89,21 @@ def aplicar_ruido(valor):
     return valor * np.random.uniform(0.95, 1.05) if noise_instrumental else valor
 
 def generar_excel_multihoja_estetico(df_resultado, lambda_val, L_val):
-    """Genera un libro Excel multi-hoja con formato profesional, colores y estilos."""
+    """Genera un libro Excel multi-hoja con formato profesional, colores y estilos y terminología de ingeniería."""
     output = io.BytesIO()
     
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        df_resultado.to_excel(writer, sheet_name='Resultados_Analisis', index=False)
+        df_resultado.to_excel(writer, sheet_name='Resultados_Estimacion', index=False)
         
-        if "Clasificación_Metabólica" in df_resultado.columns:
-            conteo = df_resultado["Clasificación_Metabólica"].value_counts().reset_index()
-            conteo.columns = ["Categoría Fisiológica", "Total Muestras"]
+        if "Estratificación_Metabólica" in df_resultado.columns:
+            conteo = df_resultado["Estratificación_Metabólica"].value_counts().reset_index()
+            conteo.columns = ["Estratificación de Riesgo", "Total Muestras"]
             conteo["Porcentaje (%)"] = (conteo["Total Muestras"] / len(df_resultado) * 100).round(2)
-            conteo.to_excel(writer, sheet_name='Distribucion_Metabolica', index=False)
+            conteo.to_excel(writer, sheet_name='Estratificacion_Metabolica', index=False)
         
         c_validos = df_resultado["Glucosa_Estimada_mM"].dropna()
         metricas = {
-            "Parámetro de Simulación": [
+            "Parámetro de Simulación In Silico": [
                 "Longitud de onda de análisis (λ)",
                 "Camino óptico configurado (L)",
                 "Total de muestras evaluadas",
@@ -121,9 +121,9 @@ def generar_excel_multihoja_estetico(df_resultado, lambda_val, L_val):
             ]
         }
         
-        df_validos = df_resultado[df_resultado["Clasificación_Metabólica"] != "Indeterminado"].copy()
+        df_validos = df_resultado[df_resultado["Estratificación_Metabólica"] != "Indeterminado"].copy()
         if "Error Relativo (%)" in df_validos.columns and not df_validos["Error Relativo (%)"].dropna().empty:
-            metricas["Parámetro de Simulación"].append("Error relativo medio (muestras válidas)")
+            metricas["Parámetro de Simulación In Silico"].append("Error relativo medio (muestras válidas)")
             metricas["Valor"].append(f"{df_validos['Error Relativo (%)'].dropna().mean():.2f} %")
             
         df_params = pd.DataFrame(metricas)
@@ -140,12 +140,12 @@ def generar_excel_multihoja_estetico(df_resultado, lambda_val, L_val):
 
 
 # --- PÁGINAS ---
-st.title("Biosensor NIR: Simulación Integrada")
-tab1, tab2, tab3, tab4 = st.tabs(["Óptica NIR", "Microfluídica", "Sensibilidad", "Inferencia Analítica"])
+st.title("Biosensor NIR: Simulación Integrada In Silico")
+tab1, tab2, tab3, tab4 = st.tabs(["Óptica NIR", "Microfluídica", "Sensibilidad", "Inferencia In Silico y Estimación"])
 
 # Tab 1: Óptica
 with tab1:
-    with st.expander("Información del Análisis", expanded=False):
+    with st.expander("Información del Análisis Óptico", expanded=False):
         st.markdown("Este módulo caracteriza la respuesta óptica del biosensor basándose en la Ley de Beer-Lambert. Calcula la absorbancia neta considerando el fenómeno de desplazamiento de agua, permitiendo visualizar la relación entre la concentración de glucosa y la absorbancia, así como el perfil espectral en la ventana de detección seleccionada.")
     
     c_range = np.linspace(0.01, 1.0, 100)
@@ -191,7 +191,7 @@ with tab1:
 
 # Tab 2: Microfluídica
 with tab2:
-    with st.expander("Información del Análisis", expanded=False):
+    with st.expander("Información del Análisis Microfluídico", expanded=False):
         st.markdown("Este módulo evalúa las propiedades hidrodinámicas del fluido dentro del canal microfluídico. Calcula parámetros críticos para el diseño, incluyendo el número de Reynolds para verificar la laminaridad del flujo y el tiempo de residencia para determinar la interacción óptima fluido-sensor.")
     
     Q_range = np.linspace(1.0, 10.0, 50)
@@ -236,7 +236,7 @@ with tab2:
 
 # Tab 3: Sensibilidad
 with tab3:
-    with st.expander("Información del Análisis", expanded=False):
+    with st.expander("Información del Análisis de Sensibilidad", expanded=False):
         st.markdown("Este estudio analiza cómo la longitud del camino óptico afecta la sensibilidad local (dA/dC) del biosensor. El objetivo es identificar configuraciones geométricas que maximicen la señal de detección sin degradar la selectividad del sistema.")
     
     L_range = np.linspace(0.1, 2.0, 50)
@@ -268,31 +268,31 @@ with tab3:
     )
     col2.plotly_chart(fig6)
 
-# Tab 4: Inferencia Analítica
+# Tab 4: Inferencia In Silico y Estimación de Concentración
 with tab4:
-    with st.expander("Información del Análisis", expanded=False):
-        st.markdown("Motor de inferencia para la estimación de concentración de glucosa a partir de valores de absorbancia. Permite el análisis puntual o el procesamiento de lotes mediante carga de archivos CSV, Parquet o TXT, clasificando las muestras según umbrales metabólicos fisiológicos.")
+    with st.expander("Información del Módulo de Inferencia", expanded=False):
+        st.markdown("Motor de inferencia in silico para la estimación de concentración de glucosa a partir de valores de absorbancia. Permite el análisis puntual o el procesamiento de lotes mediante carga de archivos CSV, Parquet o TXT, realizando estratificación de riesgo metabólico / apoyo al monitoreo.")
 
-    st.subheader("Inferencia Analítica Puntual")
+    st.subheader("Estimación de Concentración Puntual")
     col_inf1, col_inf2 = st.columns(2)
     with col_inf1:
         A_med = st.number_input("Absorbancia medida (A)", value=-0.05, step=0.001, format="%.5f")
     with col_inf2:
         error_est_pct = st.slider("Incertidumbre instrumental estimada (±%)", 1.0, 10.0, 5.0, 0.5)
 
-    if st.button("Ejecutar Inferencia Puntual", type="primary"):
+    if st.button("Ejecutar Inferencia In Silico", type="primary"):
         c_est = modelo_optico.concentracion_inversa(A_med, lambda_nm)
         delta_c = c_est * (error_est_pct / 100.0)
         c_min = max(0.0, c_est - delta_c)
         c_max = c_est + delta_c
         
-        st.markdown("### Resultado Principal de Inferencia")
+        st.markdown("### Resultado Principal de Estimación")
         m_col1, m_col2, m_col3 = st.columns(3)
         m_col1.metric("Concentración Estimada", f"{c_est:.4f} mM", f"± {delta_c:.4f} mM (IC 95%)")
         m_col2.metric("Límite Inferior (IC)", f"{c_min:.4f} mM")
         m_col3.metric("Límite Superior (IC)", f"{c_max:.4f} mM")
         
-        st.success(f"Clasificación In Silico: **{modelo_optico.evaluar_clasificacion_fisiologica(c_est)}**")
+        st.success(f"Estratificación de Riesgo Metabólico: **{modelo_optico.evaluar_clasificacion_fisiologica(c_est)}**")
         
     st.markdown("---")
     st.subheader("Procesamiento por Lotes (Carga por Chunks)")
@@ -397,7 +397,7 @@ with tab4:
                     c_real = pd.to_numeric(df_resultado[col_ref], errors="coerce")
                     df_resultado["Error Relativo (%)"] = (np.abs(df_resultado["Glucosa_Estimada_mM"] - c_real) / np.where(c_real != 0, c_real, 1e-12) * 100).round(2)
                 
-                df_resultado["Clasificación_Metabólica"] = df_resultado["Glucosa_Estimada_mM"].apply(
+                df_resultado["Estratificación_Metabólica"] = df_resultado["Glucosa_Estimada_mM"].apply(
                     lambda c: modelo_optico.evaluar_clasificacion_fisiologica(c) if pd.notna(c) else "Indeterminado"
                 )
                 
@@ -410,10 +410,7 @@ with tab4:
                 
                 st.dataframe(df_resultado)
                 
-                st.markdown("#### Análisis Estadístico y Fisiológico del Lote")
-                col_g1, col_g2 = st.columns(2)
-                
-                st.markdown("#### Análisis Estadístico y Fisiológico del Lote")
+                st.markdown("#### Análisis Estadístico y Estratificación de Riesgo Metabólico")
                 col_g1, col_g2 = st.columns(2)
                 
                 candidatos_ref = ['Glucose (mM)', 'glucosa_referencia_mM', 'Glucosa_Real_mM', 'glucosa_mM', 'glucose_mM', 'C_real']
@@ -457,7 +454,7 @@ with tab4:
                         line=dict(color='red', dash='dash')
                     ))
                     
-                    anotacion_texto = f"<b>Métricas Dinámicas:</b><br>• R² = {r2:.4f}<br>• RMSE = {rmse:.4f} mM<br>• N = {n_muestras:,}"
+                    anotacion_texto = f"<b>Métricas In Silico:</b><br>• R² = {r2:.4f}<br>• RMSE = {rmse:.4f} mM<br>• N = {n_muestras:,}"
                     fig_corr.add_annotation(
                         xref="paper", yref="paper",
                         x=0.05, y=0.95,
@@ -479,7 +476,7 @@ with tab4:
                     )
                     col_g1.plotly_chart(fig_corr)
                     
-                    # 2. Factor de Dilución Simulado para etiquetas clínicas (escala sudor: 0 a ~1.0 mM)
+                    # 2. Factor de Dilución Simulado para etiquetas (escala sudor: 0 a ~1.0 mM)
                     c_real_dil = c_real / 50.0
                     c_est_dil = c_est / 50.0
                     
@@ -498,7 +495,7 @@ with tab4:
                     
                     labels_clase = ["Normal", "Rango de Alerta / Prediabetes", "Hiperglucemia"]
                     
-                    # Generar Matriz de Confusión usando sklearn.metrics.confusion_matrix
+                    # Generar Matriz de Confusión In Silico usando sklearn.metrics.confusion_matrix
                     mask_validas = y_real_cat.isin(labels_clase) & y_est_cat.isin(labels_clase)
                     if mask_validas.sum() > 0:
                         matriz_cm = confusion_matrix(
@@ -520,7 +517,7 @@ with tab4:
                     ))
                     
                     fig_cm.update_layout(
-                        title="<b>Matriz de Confusión Clínica (Heatmap)</b>",
+                        title="<b>Matriz de Confusión In Silico (Heatmap)</b>",
                         xaxis_title="Categoría Estimada",
                         yaxis_title="Categoría Real",
                         height=380,
@@ -529,7 +526,7 @@ with tab4:
                     col_g2.plotly_chart(fig_cm)
                     
                 else:
-                    conteo_df = df_resultado["Clasificación_Metabólica"].value_counts().reset_index()
+                    conteo_df = df_resultado["Estratificación_Metabólica"].value_counts().reset_index()
                     conteo_df.columns = ["Categoría", "Muestras"]
                     
                     colores_map = {
@@ -548,7 +545,7 @@ with tab4:
                         name="Muestras por Estado"
                     ))
                     fig_lote_cat.update_layout(
-                        title="<b>Distribución de Categorías Fisiológicas</b>",
+                        title="<b>Distribución de Estratificación Metabólica</b>",
                         xaxis_title="Estado Metabólico",
                         yaxis_title="Cantidad de Muestras",
                         height=350,
